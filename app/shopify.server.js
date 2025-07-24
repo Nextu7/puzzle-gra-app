@@ -12,7 +12,7 @@ const shopify = shopifyApp({
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "temp_secret",
   apiVersion: ApiVersion.January25,
   scopes: process.env.SCOPES?.split(",") || ["read_products"],
-  appUrl: process.env.SHOPIFY_APP_URL || "https://puzzle-gra-app.onrender.com",
+  appUrl: "https://puzzle-gra-app.onrender.com",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
