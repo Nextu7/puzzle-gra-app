@@ -1,5 +1,6 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+// Disabled Firebase Admin for Render deployment
+// import { initializeApp, getApps, cert } from 'firebase-admin/app';
+// import { getFirestore } from 'firebase-admin/firestore';
 
 let adminApp;
 let adminDb;
