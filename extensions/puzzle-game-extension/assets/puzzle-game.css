@@ -1,0 +1,355 @@
+/* Puzzle Game Extension - Namespaced CSS */
+/* Prevents conflicts with theme styles */
+
+.shopify-puzzle-game-extension {
+  --puzzle-primary-color: #007bff;
+  --puzzle-secondary-color: #6c757d;
+  --puzzle-success-color: #28a745;
+  --puzzle-danger-color: #dc3545;
+  --puzzle-light-bg: #f8f9fa;
+  --puzzle-border-color: #dee2e6;
+  --puzzle-text-color: #333;
+  --puzzle-border-radius: 8px;
+  --puzzle-transition: all 0.2s ease;
+}
+
+/* Button styling - namespaced */
+.shopify-puzzle-game-extension .puzzle-trigger-btn {
+  background-color: var(--puzzle-primary-color);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: var(--puzzle-border-radius);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--puzzle-transition);
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.shopify-puzzle-game-extension .puzzle-trigger-btn:hover {
+  background-color: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+}
+
+/* Modal styling - isolated */
+.shopify-puzzle-game-extension .puzzle-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 999999; /* High z-index to ensure it's on top */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.shopify-puzzle-game-extension .puzzle-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 95vw;
+  max-height: 95vh;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.shopify-puzzle-game-extension .puzzle-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: var(--puzzle-transition);
+}
+
+.shopify-puzzle-game-extension .puzzle-close-btn:hover {
+  background-color: #f0f0f0;
+  color: var(--puzzle-text-color);
+}
+
+/* Game layout */
+.shopify-puzzle-game-extension .puzzle-layout-container {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+  min-height: 600px;
+}
+
+.shopify-puzzle-game-extension .puzzle-left-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.shopify-puzzle-game-extension .puzzle-product-section {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+/* Setup controls */
+.shopify-puzzle-game-extension .puzzle-setup-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background-color: var(--puzzle-light-bg);
+  border-radius: var(--puzzle-border-radius);
+}
+
+.shopify-puzzle-game-extension .puzzle-setup-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--puzzle-text-color);
+}
+
+.shopify-puzzle-game-extension .puzzle-difficulty-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Button styles */
+.shopify-puzzle-game-extension .puzzle-btn {
+  padding: 10px 20px;
+  border: 2px solid var(--puzzle-primary-color);
+  background-color: white;
+  color: var(--puzzle-primary-color);
+  border-radius: 25px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--puzzle-transition);
+  min-width: 60px;
+  font-family: inherit;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn:hover {
+  background-color: var(--puzzle-primary-color);
+  color: white;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn.active {
+  background-color: var(--puzzle-primary-color);
+  color: white;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn-start {
+  font-size: 16px;
+  padding: 12px 30px;
+  background-color: var(--puzzle-success-color);
+  border-color: var(--puzzle-success-color);
+  color: white;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn-start:hover {
+  background-color: #218838;
+  border-color: #218838;
+}
+
+/* Game controls */
+.shopify-puzzle-game-extension .puzzle-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background-color: var(--puzzle-light-bg);
+  border-radius: var(--puzzle-border-radius);
+  justify-content: space-between;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn-reset {
+  background-color: var(--puzzle-danger-color);
+  border-color: var(--puzzle-danger-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.shopify-puzzle-game-extension .puzzle-btn-preview {
+  background-color: var(--puzzle-secondary-color);
+  border-color: var(--puzzle-secondary-color);
+  color: white;
+}
+
+.shopify-puzzle-game-extension .puzzle-timer {
+  font-weight: 600;
+  color: var(--puzzle-text-color);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Game area */
+.shopify-puzzle-game-extension .puzzle-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.shopify-puzzle-game-extension .puzzle-game-area {
+  flex: 1;
+  border: 2px solid var(--puzzle-border-color);
+  border-radius: var(--puzzle-border-radius);
+  overflow: hidden;
+  position: relative;
+  min-height: 400px;
+}
+
+.shopify-puzzle-game-extension #puzzle-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+.shopify-puzzle-game-extension #puzzle-canvas.dragging {
+  cursor: grabbing;
+}
+
+/* Completion modal */
+.shopify-puzzle-game-extension .puzzle-complete {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  text-align: center;
+  z-index: 10;
+  max-width: 400px;
+  border: 3px solid var(--puzzle-success-color);
+}
+
+.shopify-puzzle-game-extension .puzzle-complete-content {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--puzzle-success-color);
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Product section */
+.shopify-puzzle-game-extension .puzzle-product-container {
+  background-color: var(--puzzle-light-bg);
+  border-radius: var(--puzzle-border-radius);
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.shopify-puzzle-game-extension .puzzle-product-container img {
+  width: 100%;
+  border-radius: var(--puzzle-border-radius);
+}
+
+/* Error states */
+.shopify-puzzle-game-extension .puzzle-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: var(--puzzle-border-radius);
+  border: 1px solid #f5c6cb;
+  margin: 10px 0;
+}
+
+/* Loading states */
+.shopify-puzzle-game-extension .puzzle-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--puzzle-secondary-color);
+}
+
+.shopify-puzzle-game-extension .puzzle-loading::after {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--puzzle-border-color);
+  border-top: 2px solid var(--puzzle-primary-color);
+  border-radius: 50%;
+  animation: puzzle-spin 1s linear infinite;
+  margin-left: 10px;
+}
+
+@keyframes puzzle-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .shopify-puzzle-game-extension .puzzle-layout-container {
+    flex-direction: column;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-product-section {
+    width: 100%;
+    order: -1;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-modal-content {
+    padding: 15px;
+    max-width: 98vw;
+    max-height: 98vh;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-controls {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-difficulty-pills {
+    gap: 8px;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-btn {
+    padding: 8px 16px;
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .shopify-puzzle-game-extension .puzzle-game-area {
+    min-height: 300px;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-setup-controls {
+    padding: 15px;
+  }
+  
+  .shopify-puzzle-game-extension .puzzle-complete {
+    padding: 20px;
+    max-width: 90vw;
+  }
+}

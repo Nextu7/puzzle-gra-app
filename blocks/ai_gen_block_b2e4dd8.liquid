@@ -1,0 +1,493 @@
+{% doc %}
+  @prompt
+    Create a before and after image slider block that can be used within a collapsible content section. The slider should allow users to drag a divider to reveal the before and after states of an image.
+
+{% enddoc %}
+{% assign ai_gen_id = block.id | replace: '_', '' | downcase %}
+
+{% style %}
+  .before-after-container-{{ ai_gen_id }} {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    border-radius: {{ block.settings.border_radius }}px;
+  }
+
+  .before-after-wrapper-{{ ai_gen_id }} {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  .before-image-{{ ai_gen_id }},
+  .after-image-{{ ai_gen_id }} {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .before-image-{{ ai_gen_id }} {
+    z-index: 1;
+    clip-path: polygon(0 0, var(--slider-position) 0, var(--slider-position) 100%, 0 100%);
+  }
+
+  .after-image-{{ ai_gen_id }} {
+    z-index: 0;
+  }
+
+  .slider-{{ ai_gen_id }} {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--slider-position);
+    width: {{ block.settings.divider_width }}px;
+    background-color: {{ block.settings.divider_color }};
+    z-index: 2;
+    transform: translateX(-50%);
+    cursor: ew-resize;
+  }
+
+  .slider-handle-{{ ai_gen_id }} {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: {{ block.settings.handle_size }}px;
+    height: {{ block.settings.handle_size }}px;
+    background-color: {{ block.settings.handle_color }};
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .slider-handle-{{ ai_gen_id }} svg {
+    width: 60%;
+    height: 60%;
+    color: {{ block.settings.handle_icon_color }};
+  }
+
+  .image-labels-{{ ai_gen_id }} {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+    pointer-events: none;
+  }
+
+  .before-label-{{ ai_gen_id }},
+  .after-label-{{ ai_gen_id }} {
+    background-color: {{ block.settings.label_background }};
+    color: {{ block.settings.label_text_color }};
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: {{ block.settings.label_font_size }}px;
+    font-weight: 500;
+  }
+
+  .before-after-placeholder-{{ ai_gen_id }} {
+    width: 100%;
+    aspect-ratio: {{ block.settings.aspect_ratio }};
+    background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .before-after-placeholder-{{ ai_gen_id }} svg {
+    width: 100%;
+    height: 100%;
+    max-width: 150px;
+    max-height: 150px;
+    margin-bottom: 10px;
+  }
+
+  .collapsible-content-{{ ai_gen_id }} {
+    display: none;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .collapsible-content-{{ ai_gen_id }}.open {
+    display: block;
+  }
+
+  .collapsible-trigger-{{ ai_gen_id }} {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 15px;
+    background-color: {{ block.settings.trigger_background }};
+    color: {{ block.settings.trigger_text_color }};
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    border-radius: {{ block.settings.border_radius }}px;
+    margin-bottom: 10px;
+  }
+
+  .collapsible-trigger-{{ ai_gen_id }} .icon {
+    transition: transform 0.3s ease;
+  }
+
+  .collapsible-trigger-{{ ai_gen_id }}.open .icon {
+    transform: rotate(180deg);
+  }
+
+  .collapsible-trigger-title-{{ ai_gen_id }} {
+    font-size: {{ block.settings.title_font_size }}px;
+    font-weight: 600;
+  }
+
+  @media screen and (max-width: 749px) {
+    .before-label-{{ ai_gen_id }},
+    .after-label-{{ ai_gen_id }} {
+      font-size: {{ block.settings.label_font_size | minus: 2 }}px;
+    }
+    
+    .collapsible-trigger-title-{{ ai_gen_id }} {
+      font-size: {{ block.settings.title_font_size | minus: 2 }}px;
+    }
+  }
+{% endstyle %}
+
+<div class="before-after-block-{{ ai_gen_id }}" {{ block.shopify_attributes }}>
+  <button 
+    class="collapsible-trigger-{{ ai_gen_id }}" 
+    aria-expanded="false"
+    aria-controls="collapsible-content-{{ ai_gen_id }}"
+  >
+    <span class="collapsible-trigger-title-{{ ai_gen_id }}">{{ block.settings.title }}</span>
+    <span class="icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </span>
+  </button>
+
+  <div id="collapsible-content-{{ ai_gen_id }}" class="collapsible-content-{{ ai_gen_id }}">
+    <before-after-slider-{{ ai_gen_id }} class="before-after-container-{{ ai_gen_id }}">
+      {% if block.settings.before_image and block.settings.after_image %}
+        <div class="before-after-wrapper-{{ ai_gen_id }}" style="aspect-ratio: {{ block.settings.aspect_ratio }};">
+          <img 
+            src="{{ block.settings.before_image | image_url: width: 2000 }}" 
+            alt="{{ block.settings.before_image.alt | default: block.settings.before_label }}" 
+            class="before-image-{{ ai_gen_id }}"
+            loading="lazy"
+            width="{{ block.settings.before_image.width }}"
+            height="{{ block.settings.before_image.height }}"
+          >
+          <img 
+            src="{{ block.settings.after_image | image_url: width: 2000 }}" 
+            alt="{{ block.settings.after_image.alt | default: block.settings.after_label }}" 
+            class="after-image-{{ ai_gen_id }}"
+            loading="lazy"
+            width="{{ block.settings.after_image.width }}"
+            height="{{ block.settings.after_image.height }}"
+          >
+          
+          <div class="slider-{{ ai_gen_id }}">
+            <div class="slider-handle-{{ ai_gen_id }}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+                <polyline points="9 18 3 12 9 6"></polyline>
+              </svg>
+            </div>
+          </div>
+          
+          {% if block.settings.show_labels %}
+            <div class="image-labels-{{ ai_gen_id }}">
+              <div class="before-label-{{ ai_gen_id }}">{{ block.settings.before_label }}</div>
+              <div class="after-label-{{ ai_gen_id }}">{{ block.settings.after_label }}</div>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="before-after-placeholder-{{ ai_gen_id }}">
+          {{ 'image' | placeholder_svg_tag }}
+          <p>Please select before and after images</p>
+        </div>
+      {% endif %}
+    </before-after-slider-{{ ai_gen_id }}>
+  </div>
+</div>
+
+<script>
+  (function() {
+    class BeforeAfterSlider extends HTMLElement {
+      constructor() {
+        super();
+        this.sliderPosition = 50;
+        this.isDragging = false;
+        this.wrapper = this.querySelector('.before-after-wrapper-{{ ai_gen_id }}');
+        this.slider = this.querySelector('.slider-{{ ai_gen_id }}');
+        this.beforeImage = this.querySelector('.before-image-{{ ai_gen_id }}');
+      }
+
+      connectedCallback() {
+        if (!this.wrapper) return;
+        
+        this.updateSliderPosition(this.sliderPosition);
+        
+        this.slider.addEventListener('mousedown', this.startDrag.bind(this));
+        this.slider.addEventListener('touchstart', this.startDrag.bind(this), { passive: true });
+        
+        document.addEventListener('mousemove', this.drag.bind(this));
+        document.addEventListener('touchmove', this.drag.bind(this), { passive: false });
+        
+        document.addEventListener('mouseup', this.endDrag.bind(this));
+        document.addEventListener('touchend', this.endDrag.bind(this));
+        
+        window.addEventListener('resize', this.updateSliderPosition.bind(this, this.sliderPosition));
+      }
+      
+      startDrag(e) {
+        this.isDragging = true;
+        e.preventDefault();
+      }
+      
+      drag(e) {
+        if (!this.isDragging) return;
+        
+        e.preventDefault();
+        
+        const containerRect = this.getBoundingClientRect();
+        let clientX;
+        
+        if (e.type === 'touchmove') {
+          clientX = e.touches[0].clientX;
+        } else {
+          clientX = e.clientX;
+        }
+        
+        let position = ((clientX - containerRect.left) / containerRect.width) * 100;
+        position = Math.max(0, Math.min(100, position));
+        
+        this.sliderPosition = position;
+        this.updateSliderPosition(position);
+      }
+      
+      endDrag() {
+        this.isDragging = false;
+      }
+      
+      updateSliderPosition(position) {
+        if (!this.wrapper) return;
+        
+        this.wrapper.style.setProperty('--slider-position', `${position}%`);
+      }
+    }
+
+    customElements.define('before-after-slider-{{ ai_gen_id }}', BeforeAfterSlider);
+    
+    // Collapsible functionality
+    const trigger = document.querySelector('.collapsible-trigger-{{ ai_gen_id }}');
+    const content = document.querySelector('.collapsible-content-{{ ai_gen_id }}');
+    
+    if (trigger && content) {
+      trigger.addEventListener('click', function() {
+        const expanded = this.getAttribute('aria-expanded') === 'true';
+        this.setAttribute('aria-expanded', !expanded);
+        this.classList.toggle('open');
+        content.classList.toggle('open');
+      });
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Before After Slider",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "Collapsible Content"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Title",
+      "default": "Before & After Comparison"
+    },
+    {
+      "type": "color",
+      "id": "trigger_background",
+      "label": "Trigger background",
+      "default": "#f4f4f4"
+    },
+    {
+      "type": "color",
+      "id": "trigger_text_color",
+      "label": "Trigger text color",
+      "default": "#121212"
+    },
+    {
+      "type": "range",
+      "id": "title_font_size",
+      "min": 14,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "label": "Title font size",
+      "default": 18
+    },
+    {
+      "type": "header",
+      "content": "Image Settings"
+    },
+    {
+      "type": "image_picker",
+      "id": "before_image",
+      "label": "Before image"
+    },
+    {
+      "type": "image_picker",
+      "id": "after_image",
+      "label": "After image"
+    },
+    {
+      "type": "select",
+      "id": "aspect_ratio",
+      "label": "Aspect ratio",
+      "options": [
+        {
+          "value": "1/1",
+          "label": "1:1 (Square)"
+        },
+        {
+          "value": "3/2",
+          "label": "3:2"
+        },
+        {
+          "value": "4/3",
+          "label": "4:3"
+        },
+        {
+          "value": "16/9",
+          "label": "16:9"
+        }
+      ],
+      "default": "16/9"
+    },
+    {
+      "type": "header",
+      "content": "Slider Settings"
+    },
+    {
+      "type": "range",
+      "id": "divider_width",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "unit": "px",
+      "label": "Divider width",
+      "default": 3
+    },
+    {
+      "type": "color",
+      "id": "divider_color",
+      "label": "Divider color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "handle_size",
+      "min": 20,
+      "max": 60,
+      "step": 5,
+      "unit": "px",
+      "label": "Handle size",
+      "default": 40
+    },
+    {
+      "type": "color",
+      "id": "handle_color",
+      "label": "Handle color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "handle_icon_color",
+      "label": "Handle icon color",
+      "default": "#000000"
+    },
+    {
+      "type": "header",
+      "content": "Labels"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_labels",
+      "label": "Show labels",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "before_label",
+      "label": "Before label",
+      "default": "Before"
+    },
+    {
+      "type": "text",
+      "id": "after_label",
+      "label": "After label",
+      "default": "After"
+    },
+    {
+      "type": "color",
+      "id": "label_background",
+      "label": "Label background",
+      "default": "rgba(0, 0, 0, 0.7)"
+    },
+    {
+      "type": "color",
+      "id": "label_text_color",
+      "label": "Label text color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "label_font_size",
+      "min": 12,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "label": "Label font size",
+      "default": 14
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "label": "Border radius",
+      "default": 8
+    }
+  ],
+  "presets": [
+    {
+      "name": "Before After Slider"
+    }
+  ]
+}
+{% endschema %}

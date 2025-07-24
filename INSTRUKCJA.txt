@@ -1,0 +1,26 @@
+🔥 INSTRUKCJA URUCHOMIENIA - KROK PO KROK 🔥
+
+1. KLIKNIJ 2 RAZY NA: START_NGROK.bat
+   - Poczekaj aż pokaże URL typu: https://1234abcd.ngrok-free.app
+   - SKOPIUJ TEN URL!
+   - ZOSTAW TO OKNO OTWARTE!
+
+2. OTWÓRZ PLIK: .env (w notatniku)
+   - Znajdź linię: SHOPIFY_APP_URL=https://your-domain.com
+   - ZAMIEŃ NA: SHOPIFY_APP_URL=https://1234abcd.ngrok-free.app (TWÓJ URL!)
+   - ZNAJDŹ: HOST=https://your-domain.com  
+   - ZAMIEŃ NA: HOST=https://1234abcd.ngrok-free.app (TWÓJ URL!)
+   - ZAPISZ PLIK!
+
+3. KLIKNIJ 2 RAZY NA: START_APP.bat
+   - Poczekaj aż napisze "Ready"
+   - ZOSTAW TO OKNO OTWARTE!
+
+4. IDŹ DO PRZEGLĄDARKI:
+   https://quick-start-050802f9.myshopify.com/admin/apps
+
+5. JEŚLI NIE DZIAŁA:
+   - Idź do Shopify Partner Dashboard
+   - Zaktualizuj URL aplikacji na TWÓJ ngrok URL
+
+GOTOWE!

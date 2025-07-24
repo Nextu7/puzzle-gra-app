@@ -1,0 +1,46 @@
+tunnel: YOUR_TUNNEL_ID
+credentials-file: C:\Users\%USERNAME%\.cloudflared\YOUR_TUNNEL_ID.json
+
+ingress:
+  # Main app traffic - stable configuration
+  - hostname: puzzle-gra.your-domain.com
+    service: http://localhost:3000
+    originRequest:
+      httpHostHeader: puzzle-gra.your-domain.com
+      connectTimeout: 60s
+      tlsTimeout: 30s
+      tcpKeepAlive: 60s
+      keepAliveConnections: 50
+      keepAliveTimeout: 120s
+      noHappyEyeballs: true
+      disableChunkedEncoding: false
+      http2Origin: false
+
+  # Development subdomain for testing
+  - hostname: dev-puzzle-gra.your-domain.com
+    service: http://localhost:3000
+    originRequest:
+      httpHostHeader: dev-puzzle-gra.your-domain.com
+      connectTimeout: 60s
+      tlsTimeout: 30s
+      tcpKeepAlive: 60s
+      keepAliveConnections: 50
+      keepAliveTimeout: 120s
+
+  # HMR WebSocket traffic with fallback
+  - hostname: hmr-puzzle-gra.your-domain.com
+    service: http://localhost:3000
+    originRequest:
+      httpHostHeader: hmr-puzzle-gra.your-domain.com
+      connectTimeout: 60s
+      tlsTimeout: 30s
+
+  # Catch-all rule (required)
+  - service: http_status:404
+
+# Optional: Log configuration
+#logLevel: info
+#logFile: /var/log/cloudflared.log
+
+# Optional: Metrics
+#metrics: localhost:8080

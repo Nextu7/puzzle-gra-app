@@ -1,0 +1,36 @@
+{%- assign obj = obj | default: product | default: card_product -%}
+
+{%- if obj and obj.metafields.custom.poziom_trudnosci.value != blank -%}
+  {%- assign difficulty_text = obj.metafields.custom.poziom_trudnosci.value
+      | join: '' | strip -%}
+  {%- assign difficulty_slug = difficulty_text | handleize -%}
+  <span class="badge difficulty-badge difficulty-{{ difficulty_slug }}">
+    {{ difficulty_text }}
+  </span>
+{%- endif -%}
+
+{% style %}
+.difficulty-badge {
+  position: absolute;
+  top: 1rem;
+  z-index: 2;
+  /*border-radius: 0 20px 20px 0;*/
+}
+  
+.difficulty-latwe {
+  background-color: #79d85b;
+}
+
+.difficulty-srednie {
+  background-color: #ffe84c;
+}
+
+.difficulty-trudne {
+  background-color: #f14445;
+}
+
+.difficulty-bardzo-trudne {
+  background-color: #80001e;
+  color: #fff;
+}
+{% endstyle %}

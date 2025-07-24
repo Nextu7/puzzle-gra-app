@@ -1,0 +1,528 @@
+{{ 'component-card.css' | asset_url | stylesheet_tag }}
+{{ 'component-price.css' | asset_url | stylesheet_tag }}
+{{ 'template-collection.css' | asset_url | stylesheet_tag }}
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js" async></script>
+
+<style>
+    .bb-layout-{{ section.id }} {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+    @media (min-width: 990px) {
+        .bb-layout-{{ section.id }} {
+            grid-template-columns: 1fr 1fr;
+        }
+        .bb-right-column-{{ section.id }} {
+            position: sticky;
+            top: 2rem;
+            height: calc(100vh - 4rem);
+        }
+    }
+    .bb-filters-box {
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid rgba(var(--color-foreground), 0.1);
+        border-radius: var(--card-corner-radius);
+    }
+    .bb-collections-list {
+        display: flex;
+        gap: 1rem;
+        overflow-x: auto;
+        padding-bottom: 0.5rem;
+        scroll-behavior: smooth;
+    }
+    .bb-collections-list::-webkit-scrollbar { display: none; }
+    .bb-collections-list { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    .bb-collection-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border: 2px solid transparent;
+        border-radius: 0.5rem;
+        background: none;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .bb-collection-btn.active {
+        border-color: rgb(var(--color-accent-1));
+    }
+    .bb-collection-btn img, .bb-collection-btn .placeholder-svg {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    .bb-collection-btn span { font-size: 0.75rem; }
+
+    .bb-product-card-wrapper.selected .card {
+        border: 2px solid rgb(var(--color-accent-1));
+        box-shadow: var(--shadow-elevation-medium);
+    }
+    
+    .bb-summary-box {
+        background-color: rgba(var(--color-background), 0.5);
+        padding: 1.5rem;
+        border-radius: var(--card-corner-radius);
+        border: 1px solid rgba(var(--color-foreground), 0.1);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .bb-model-viewer-wrapper {
+        background-color: rgba(var(--color-foreground), 0.04);
+        border-radius: var(--media-radius);
+        margin-bottom: 1.5rem;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+    }
+    .bb-model-viewer-wrapper model-viewer { 
+        width: 100%; 
+        height: 100%; 
+        aspect-ratio: 1 / 1;
+    }
+    .bb-summary-scroll-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        margin-right: -0.75rem;
+        padding-right: 0.75rem;
+    }
+    .bb-summary-slot {
+        background-color: rgba(var(--color-foreground), 0.04);
+        border-radius: var(--card-corner-radius);
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .bb-summary-slot .slot-header { display: flex; align-items: center; gap: 1rem; }
+    .bb-summary-slot img { width: 4rem; height: 4rem; border-radius: var(--media-radius); object-fit: cover; }
+    .bb-summary-slot .remove-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: rgba(var(--color-foreground), 0.55); padding: 0; line-height: 1; }
+    .bb-summary-slot .remove-btn:hover { color: rgba(var(--color-foreground), 1); }
+    .bb-variant-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .bb-variant-pill {
+        font-size: 0.875rem;
+        border: 1px solid rgba(var(--color-foreground), 0.2);
+        border-radius: 9999px;
+        padding: 0.25rem 0.75rem;
+        background-color: rgb(var(--color-background));
+        cursor: pointer;
+    }
+    .bb-variant-pill.active { background-color: rgb(var(--color-accent-1)); color: rgb(var(--color-background-contrast)); border-color: rgb(var(--color-accent-1)); }
+    
+    .bb-summary-footer { flex-shrink: 0; padding-top: 1rem; margin-top: auto; }
+    .bb-price-summary { padding-top: 1rem; border-top: 1px solid rgba(var(--color-foreground), 0.1); display: flex; justify-content: space-between; align-items: center; }
+    .bb-add-to-cart-btn { width: 100%; margin-top: 1.5rem; }
+    .bb-load-more-container { text-align: center; margin-top: 2rem; }
+</style>
+
+<div class="page-width section-{{ section.id }}-padding">
+    <div class="title-wrapper title-wrapper--no-top-margin">
+        <h2 class="title {{ section.settings.heading_size }}">{{ section.settings.title | escape }}</h2>
+        {% if section.settings.subtitle != blank %}
+            <p class="subtitle">{{ section.settings.subtitle | escape }}</p>
+        {% endif %}
+    </div>
+
+    <div class="bb-layout-{{ section.id }}">
+        <div class="bb-left-column-{{ section.id }}">
+            <div class="bb-filters-box">
+                <div class="bb-collections-container">
+                    <div id="collection-filters-list-{{ section.id }}" class="bb-collections-list">
+                        <button class="bb-collection-btn active" data-collection-handle="all">
+                            <div class="placeholder-svg" style="width: 4rem; height: 4rem; border-radius: 50%; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            </div>
+                            <span>Wszystkie</span>
+                        </button>
+                        {% for block in section.blocks %}
+                            {%- assign collection = block.settings.collection -%}
+                            {% if collection != blank %}
+                                <button class="bb-collection-btn" data-collection-handle="{{ collection.handle }}">
+                                    {% if collection.featured_image %}
+                                        <img src="{{ collection.featured_image | image_url: width: 100, height: 100, crop: 'center' }}" alt="{{ collection.title | escape }}">
+                                    {% else %}
+                                        <div class="placeholder-svg" style="width: 4rem; height: 4rem; border-radius: 50%; background-color: #f3f4f6;"></div>
+                                    {% endif %}
+                                    <span>{{ collection.title | escape }}</span>
+                                </button>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <div id="bundle-builder-grid-{{ section.id }}">
+                {%- assign master_collection = section.settings.master_collection -%}
+                {% paginate master_collection.products by 12 %}
+                    <ul id="product-grid-{{ section.id }}" class="grid product-grid grid--{{ section.settings.columns_desktop }}-col-desktop grid--{{ section.settings.columns_mobile }}-col-tablet-down" role="list">
+                        {% for product in master_collection.products %}
+                            <li class="grid__item bb-product-card-wrapper" 
+                                data-product-id="{{ product.id }}" 
+                                data-product-data='{{ product | json }}'>
+                                {% render 'card-product',
+                                   card_product: product,
+                                   media_aspect_ratio: 'adapt',
+                                   show_secondary_image: false,
+                                   show_vendor: false,
+                                   show_rating: false
+                                %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {%- if paginate.next -%}
+                        <div id="load-more-container-{{ section.id }}" class="bb-load-more-container">
+                            <a href="{{ paginate.next.url }}" id="load-more-btn-{{ section.id }}" class="button">Pokaż więcej</a>
+                        </div>
+                    {%- endif -%}
+                {% endpaginate %}
+            </div>
+        </div>
+
+        <aside class="bb-right-column-{{ section.id }}">
+            <div class="bb-summary-box">
+                <h3 class="h3">output</h3>
+                <div class="bb-model-viewer-wrapper">
+                    <model-viewer id="model-viewer-{{ section.id }}" src="{{ section.settings.model_3d_url }}" environment-image="neutral" camera-controls alt="{{ section.settings.alt_text | default: 'Interactive 3D bundle' | escape }}"></model-viewer>
+                </div>
+                <div class="bb-summary-scroll-area">
+                  <div id="selected-items-summary-{{ section.id }}"></div>
+                </div>
+                <div class="bb-summary-footer">
+                  <div class="bb-price-summary">
+                      <span class="h4">Suma:</span>
+                      <span id="total-price-{{ section.id }}" class="h3">{{ 0 | money }}</span>
+                  </div>
+                  <button id="add-to-cart-btn-{{ section.id }}" class="bb-add-to-cart-btn button button--primary">
+                      Dodaj zestaw do koszyka
+                  </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sectionId = '{{ section.id }}';
+        const modelViewer = document.getElementById(`model-viewer-${sectionId}`);
+        const productGridContainer = document.getElementById(`bundle-builder-grid-${sectionId}`);
+        const collectionFiltersList = document.getElementById(`collection-filters-list-${sectionId}`);
+        const addToCartBtn = document.getElementById(`add-to-cart-btn-${sectionId}`);
+        const summaryContainer = document.getElementById(`selected-items-summary-${sectionId}`);
+        const totalPriceEl = document.getElementById(`total-price-${sectionId}`);
+        
+        let selectedProducts = [];
+        let allProductsData = new Map();
+        const MAX_SELECTIONS = 3;
+        const materialNames = [
+            '{{ section.settings.material_name_1 | escape }}',
+            '{{ section.settings.material_name_2 | escape }}',
+            '{{ section.settings.material_name_3 | escape }}'
+        ];
+
+        function formatMoney(cents) {
+            return `PLN ${(cents / 100).toFixed(2).replace('.', ',')}`;
+        }
+
+        async function update3DTexture(product, slotIndex) {
+            if (!modelViewer || !modelViewer.model || !product) return;
+            const materialName = materialNames[slotIndex];
+            if (!materialName) return;
+            const material = modelViewer.model.getMaterialByName(materialName);
+            if (!material) return;
+            try {
+                const texture = await modelViewer.createTexture(product.featured_image.src);
+                material.pbrMetallicRoughness.setBaseColorFactor([1, 1, 1, 1]);
+                material.pbrMetallicRoughness.baseColorTexture.setTexture(texture);
+            } catch (error) {}
+        }
+        
+        async function clear3DTexture(slotIndex) {
+            if (!modelViewer || !modelViewer.model) return;
+            const materialName = materialNames[slotIndex];
+            if (!materialName) return;
+            const material = modelViewer.model.getMaterialByName(materialName);
+            if (material) material.pbrMetallicRoughness.baseColorTexture.setTexture(null);
+        }
+
+        function handleProductSelection(productData) {
+            const productIndex = selectedProducts.findIndex(sp => sp.productId === productData.id);
+            if (productIndex > -1) {
+                selectedProducts.splice(productIndex, 1);
+            } else {
+                if (selectedProducts.length < MAX_SELECTIONS) {
+                    selectedProducts.push({ productId: productData.id, variantId: productData.variants[0].id });
+                } else {
+                    alert(`Możesz wybrać maksymalnie ${MAX_SELECTIONS} wzory.`);
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            summaryContainer.innerHTML = '';
+            let total = 0;
+
+            for (let i = 0; i < MAX_SELECTIONS; i++) {
+                const selectedItem = selectedProducts[i];
+                const slotEl = document.createElement('div');
+                slotEl.className = `bb-summary-slot`;
+
+                if (selectedItem) {
+                    const productData = allProductsData.get(selectedItem.productId);
+                    const selectedVariant = productData.variants.find(v => v.id === selectedItem.variantId);
+                    total += selectedVariant.price;
+                    update3DTexture(productData, i);
+
+                    const variantPills = productData.variants.map(v =>
+                        `<button data-product-id="${productData.id}" data-variant-id="${v.id}" class="bb-variant-pill ${v.id === selectedVariant.id ? 'active' : ''}">${v.title}</button>`
+                    ).join('');
+
+                    slotEl.innerHTML = `
+                        <div class="slot-header">
+                            <img src="${productData.featured_image.src}" alt="${productData.title}">
+                            <div class="card__information">
+                                <p class="card__heading h5">${productData.title}</p>
+                                <div class="price">${formatMoney(selectedVariant.price)}</div>
+                            </div>
+                            <button data-remove-id="${productData.id}" class="remove-btn">&times;</button>
+                        </div>
+                        <div class="bb-variant-pills">${variantPills}</div>
+                    `;
+                } else {
+                    slotEl.innerHTML = `<div class="slot-header"><div style="width:4rem; height:4rem; background-color:rgba(var(--color-foreground),0.08); border-radius:var(--media-radius); display:flex; align-items:center; justify-content:center; font-size:1.5rem; font-weight:700;">${i + 1}</div><span>Wybierz wzór</span></div>`;
+                    clear3DTexture(i);
+                }
+                summaryContainer.appendChild(slotEl);
+            }
+            totalPriceEl.textContent = formatMoney(total);
+            addToCartBtn.disabled = selectedProducts.length !== MAX_SELECTIONS;
+
+            productGridContainer.querySelectorAll('.bb-product-card-wrapper').forEach(card => {
+                const cardId = parseInt(card.dataset.productId);
+                card.classList.toggle('selected', selectedProducts.some(sp => sp.productId === cardId));
+            });
+        }
+        
+        function initProductDataAndListeners() {
+            productGridContainer.querySelectorAll('.grid__item').forEach(el => {
+                const productData = JSON.parse(el.dataset.productData);
+                allProductsData.set(productData.id, productData);
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handleProductSelection(productData);
+                });
+            });
+        }
+
+        summaryContainer.addEventListener('click', (e) => {
+            const target = e.target.closest('button');
+            if (!target) return;
+            if (target.classList.contains('remove-btn')) {
+                const productIdToRemove = parseInt(target.dataset.removeId);
+                selectedProducts = selectedProducts.filter(p => p.productId !== productIdToRemove);
+                updateUI();
+            }
+            if (target.classList.contains('bb-variant-pill')) {
+                const productId = parseInt(target.dataset.productId);
+                const variantId = parseInt(target.dataset.variantId);
+                const productIndex = selectedProducts.findIndex(p => p.productId === productId);
+                if (productIndex > -1) selectedProducts[productIndex].variantId = variantId;
+                updateUI();
+            }
+        });
+
+        addToCartBtn.addEventListener('click', () => {
+            if (selectedProducts.length !== MAX_SELECTIONS) return;
+            addToCartBtn.classList.add('loading');
+            const buttonText = addToCartBtn.querySelector('.button__text');
+            if(buttonText) buttonText.textContent = 'Dodawanie...';
+            
+            addToCartBtn.disabled = true;
+
+            const items = selectedProducts.map(p => ({ id: p.variantId, quantity: 1 }));
+
+            fetch(window.Shopify.routes.root + 'cart/add.js', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: items })
+            })
+            .then(response => response.json())
+            .then(data => { window.location.href = window.Shopify.routes.root + 'cart'; })
+            .catch(error => {
+                if(buttonText) buttonText.textContent = 'Błąd, spróbuj ponownie';
+                setTimeout(() => {
+                    if(buttonText) buttonText.textContent = 'Dodaj zestaw do koszyka';
+                    addToCartBtn.disabled = false;
+                    addToCartBtn.classList.remove('loading');
+                }, 2000);
+            });
+        });
+        
+        productGridContainer.addEventListener('click', (e) => {
+            const cardLink = e.target.closest('.full-unstyled-link');
+            const card = e.target.closest('.grid__item');
+            if (cardLink && card) {
+                e.preventDefault();
+                const productData = allProductsData.get(parseInt(card.dataset.productId));
+                handleProductSelection(productData);
+            }
+        });
+
+        const loadMoreBtn = document.getElementById(`load-more-btn-{{ section.id }}`);
+        if(loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                this.textContent = 'Ładowanie...';
+                this.disabled = true;
+
+                fetch(this.href)
+                    .then(response => response.text())
+                    .then(text => {
+                        const html = document.createElement('div');
+                        html.innerHTML = text;
+                        const newGrid = html.querySelector(`#product-grid-${sectionId}`);
+                        const newLoadMore = html.querySelector(`#load-more-container-{{ section.id }}`);
+                        
+                        document.getElementById(`product-grid-${sectionId}`).insertAdjacentHTML('beforeend', newGrid.innerHTML);
+                        
+                        const loadMoreContainer = document.getElementById(`load-more-container-{{ section.id }}`);
+                        if (newLoadMore) {
+                           loadMoreContainer.innerHTML = newLoadMore.innerHTML;
+                           // Re-attach event listener to the new button
+                           document.getElementById(`load-more-btn-{{ section.id }}`).addEventListener('click', arguments.callee);
+                        } else {
+                           loadMoreContainer.remove();
+                        }
+                        initProductDataAndListeners(); // Re-initialize for new products
+                    });
+            });
+        }
+        
+        initProductDataAndListeners();
+        updateUI();
+    });
+</script>
+
+{% schema %}
+{
+  "name": "Kreator Zestawu 3D",
+  "tag": "section",
+  "class": "bundle-builder",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Tytuł",
+      "default": "Zbuduj Swój Własny Zestaw"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "subtitle",
+      "label": "Podtytuł",
+      "default": "Wybierz 3 dowolne wzory, aby stworzyć unikalny zestaw."
+    },
+    {
+      "type": "select",
+      "id": "heading_size",
+      "options": [
+        { "value": "h2", "label": "Średni" },
+        { "value": "h1", "label": "Duży" },
+        { "value": "h0", "label": "Bardzo duży" }
+      ],
+      "default": "h1",
+      "label": "Rozmiar tytułu"
+    },
+    {
+      "type": "header",
+      "content": "Ustawienia Sceny 3D"
+    },
+    {
+      "type": "url",
+      "id": "model_3d_url",
+      "label": "Link do modelu 3D (.glb)"
+    },
+    {
+      "type": "text",
+      "id": "alt_text",
+      "label": "Tekst alternatywny dla modelu",
+      "default": "Interaktywny zestaw puzzli 3D"
+    },
+    {
+      "type": "header",
+      "content": "Mapowanie materiałów"
+    },
+    {
+      "type": "text",
+      "id": "material_name_1",
+      "label": "Nazwa materiału dla slotu 1",
+      "info": "Dokładna nazwa materiału z pliku .glb"
+    },
+    {
+      "type": "text",
+      "id": "material_name_2",
+      "label": "Nazwa materiału dla slotu 2"
+    },
+    {
+      "type": "text",
+      "id": "material_name_3",
+      "label": "Nazwa materiału dla slotu 3"
+    },
+    {
+      "type": "header",
+      "content": "Dane Produktów"
+    },
+    {
+      "type": "collection",
+      "id": "master_collection",
+      "label": "Główna kolekcja z produktami",
+      "info": "Wybierz kolekcję zawierającą WSZYSTKIE produkty, które mają być dostępne w tym kreatorze."
+    },
+    {
+      "type": "header",
+      "content": "Wygląd siatki produktów"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "min": 2,
+      "max": 4,
+      "step": 1,
+      "default": 4,
+      "label": "Liczba kolumn (desktop)"
+    },
+    {
+      "type": "select",
+      "id": "columns_mobile",
+      "options": [
+        { "value": "1", "label": "1 kolumna" },
+        { "value": "2", "label": "2 kolumny" }
+      ],
+      "default": "2",
+      "label": "Liczba kolumn (mobile)"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection_filter",
+      "name": "Filtr Kolekcji",
+      "limit": 15,
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Wybierz kolekcję do filtrowania"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Kreator Zestawu 3D"
+    }
+  ]
+}
+{% endschema %}

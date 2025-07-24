@@ -1,0 +1,62 @@
+{{ 'collection-menu.css' | asset_url | stylesheet_tag }}
+
+<nav class="collection-menu" aria-label="Kategorie">
+  <ul>
+    {% for link in links %}
+      {% assign child_active_count = link.links | where: 'active', true | size %}
+      {% assign grand_active_count = 0 %}
+      {% for c in link.links %}
+        {% assign ga = c.links | where: 'active', true | size %}
+        {% assign grand_active_count = grand_active_count | plus: ga %}
+      {% endfor %}
+      {% if link.active or child_active_count > 0 or grand_active_count > 0 %}
+        {% assign open = true %}
+      {% else %}
+        {% assign open = false %}
+      {% endif %}
+
+      <li class="menu-link{% if link.links.size > 0 %} has-children{% endif %}{% if open %} open{% endif %}{% if link.active %} active bold{% endif %}">
+        <a href="{{ link.url }}">
+          {{ link.title }}
+          {% if link.links.size > 0 %}
+            <span class="icon-caret" aria-hidden="true">{{ 'icon-caret.svg' | inline_asset_content }}</span>
+          {% endif %}
+        </a>
+
+        {% if link.links.size > 0 %}
+          <ul>
+            {% for child_link in link.links %}
+              {% assign grand_active = child_link.links | where: 'active', true | size %}
+              {% if child_link.active or grand_active > 0 %}
+                {% assign open_child = true %}
+              {% else %}
+                {% assign open_child = false %}
+              {% endif %}
+
+              <li id="menu-{{ child_link.handle }}" class="menu-link{% if child_link.links.size > 0 %} has-children{% endif %}{% if open_child %} open{% endif %}{% if child_link.active %} active bold{% endif %}">
+                <a href="{{ child_link.url }}">
+                  {{ child_link.title }}
+                  {% if child_link.links.size > 0 %}
+                    <span class="icon-caret" aria-hidden="true">{{ 'icon-caret.svg' | inline_asset_content }}</span>
+                  {% endif %}
+                </a>
+
+                {% if child_link.links.size > 0 %}
+                  <ul>
+                    {% for grandchild_link in child_link.links %}
+                      <li class="menu-link{% if grandchild_link.active %} active bold{% endif %}">
+                        <a href="{{ grandchild_link.url }}">{{ grandchild_link.title }}</a>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</nav>
+
+<script src="{{ 'collection-menu.js' | asset_url }}" defer></script>

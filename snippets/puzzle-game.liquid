@@ -1,0 +1,1544 @@
+
+
+{{ 'component-puzzle-modal.css' | asset_url | stylesheet_tag }} 
+{% if product.metafields.custom.grafika and product.metafields.custom.grafika.value != blank %} 
+  {% assign base_img = product.metafields.custom.grafika %} {% else %} {% assign base_img = product.featured_image %} {% endif %} 
+  {% assign puzzle_src = base_img | image_url: width: 1600, format: webp, quality: 90 %} 
+  {% assign puzzle_preview = base_img | image_url: width: 800, format: webp, quality: 80 %}
+
+<div id="puzzle-modal" class="puzzle-modal" style="display: none;">
+    <div class="puzzle-modal-content">
+        <button id="puzzle-close-btn" class="puzzle-close-btn">&times;</button>
+        <div class="puzzle-layout-container">
+            <div class="puzzle-left-section">
+                <div id="puzzle-setup-controls" class="puzzle-setup-controls">
+                    <p class="puzzle-setup-title">Wybierz poziom trudności:</p>
+                    <div class="puzzle-difficulty-pills">
+                        <button class="puzzle-btn" data-difficulty="p30">30</button>
+                        <button class="puzzle-btn active" data-difficulty="p56">56</button>
+                        <button class="puzzle-btn" data-difficulty="p99">99</button>
+                        <button class="puzzle-btn" data-difficulty="p143">143</button>
+                        <button class="puzzle-btn" data-difficulty="p304">304</button>
+                    </div>
+                    <button id="puzzle-btn-start-game" class="puzzle-btn puzzle-btn-start">Rozpocznij grę</button>
+                </div>
+                <div class="puzzle-container">
+                    <div class="puzzle-controls" style="display: none;">
+                        <button id="puzzle-btn-reset" class="puzzle-btn puzzle-btn-reset"><span>↻</span> Reset</button>
+                        <button id="puzzle-btn-preview" class="puzzle-btn puzzle-btn-preview">Podgląd</button>
+                        <span class="puzzle-timer">⏱️ Czas: <span id="timer-display">00:00</span></span>
+                    </div>
+                    <div id="puzzle-complete" class="puzzle-complete" style="display: none;">
+    
+                      <div class="puzzle-complete-content"><span>✓</span> PUZZLE UŁOŻONE!</div>
+                      <div class="puzzle-complete-time" id="puzzle-complete-time"></div>
+
+                      <div id="create-nickname-container" style="display: none; margin: 20px 0; padding: 15px; border: 1px solid #ccc;">
+                        <h4>Wybierz swoją nazwę gracza</h4>
+                        <p style="font-size: 14px; margin-top: 0;">Ta nazwa będzie widoczna w rankingu. Wybierasz ją tylko raz.</p>
+                        <input type="text" id="nickname-input" placeholder="Twój nick..." maxlength="25" style="padding: 8px; width: 200px; text-align: center;">
+                        <button id="save-nickname-btn" class="puzzle-btn" style="margin-left: 10px;">Zapisz</button>
+                    </div>
+                      
+                      <div class="leaderboard-container" id="leaderboard-container" style="max-width: 400px; margin: 20px auto; text-align: left; border-top: 1px solid #ccc; padding-top: 15px;">
+                          <h4 style="text-align: center;">🏆 Ranking dla tego poziomu 🏆</h4>
+                          <ol id="leaderboard-list"></ol> <p id="leaderboard-loading" style="display: none;">Ładowanie...</p>
+                      </div>
+                      <button id="puzzle-btn-play-again" class="puzzle-btn">Zagraj ponownie</button>
+                  
+                    </div>
+                  
+                    <div id="puzzle-game-area" class="puzzle-game-area">
+                        <canvas id="puzzle-canvas" style="background-color: #fff;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="puzzle-product-section">
+                <div id="puzzle-product-container" class="puzzle-product-container">
+                    <div id="puzzle-product-image-container"></div>
+                    <div id="puzzle-product-form-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+ const productId = {{ product.id }};
+let customerData = null;
+{% if customer %}
+  customerData = {
+    id: {{ customer.id }},
+    first_name: {{ customer.first_name | json }}
+  };
+{% endif %}
+
+// DEPRECATED: This liquid template is deprecated
+// Use the new Remix-based puzzle game instead
+console.warn('puzzle-game.liquid is deprecated. Please use the new Remix-based puzzle game.');
+
+// API client for new backend
+class PuzzleAPI {
+  static async request(endpoint, options = {}) {
+    const response = await fetch(`/api/puzzle/${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      ...options
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+    
+    return response.json();
+  }
+
+  static async createPlayer(customerId, nickname) {
+    return this.request('players', {
+      method: 'POST',
+      body: JSON.stringify({ customerId, nickname })
+    });
+  }
+
+  static async saveScore(playerId, productId, difficulty, timeInSeconds) {
+    return this.request('scores', {
+      method: 'POST',
+      body: JSON.stringify({ playerId, productId, difficulty, timeInSeconds })
+    });
+  }
+
+  static async getLeaderboard(productId, difficulty) {
+    return this.request(`scores?productId=${productId}&difficulty=${difficulty}`);
+  }
+}
+
+
+  
+    const PuzzleApp = {
+        state: {
+    isInitialized: false,
+    gameStarted: false,
+    image: null,
+    pieces: [],
+    groups: [],
+    difficulty: "p56",
+    draggedGroup: null,
+    clickedPiece: null,
+    dragOffset: { x: 0, y: 0 },
+    isComplete: false,
+    SNAP_DISTANCE: 30,
+    showPreview: false,
+    startTime: null,
+    timerInterval: null,
+    canvas: null,
+    ctx: null,
+    gameAreaRect: null,
+    animationFrameId: null,
+    lastRenderTime: 0,
+    targetRenderInterval: 16,
+    avgRenderTime: 16,
+    pieceCache: new Map(),
+    pieceCacheOrder: [],
+    pieceCacheLimitMultiplier: 1.2,
+    isMobile: false,
+    sliderHeight: 120,
+    sliderPieceSpacing: 10,
+    sliderPadding: 10,
+    sliderScrollX: 0,
+    sliderScrollVelocity: 0,
+    scrollAnimationId: null,
+    dpr: window.devicePixelRatio || 1,
+    audioCtx: null,
+    connectSoundBuffer: null,
+    interactionMode: "IDLE",
+    longPressTimer: null,
+    LONG_PRESS_DURATION: 10,
+    SWIPE_THRESHOLD: 10,
+    interactionStartPos: null,
+    interactionLastPos: null,
+    dirty: true,
+    dirtySlider: true,
+    dirtyBoard: true,
+    pieceById: new Map(),
+    groupById: new Map(),
+    piecesByGroup: new Map(),
+    openEdgesByGroup: new Map(),
+    gridCellSize: 0,
+    gridMap: new Map(),
+    maxZ: 0,
+    rngSeed: 0,
+    useSeed: false,
+    originalProductInfoParent: null,
+    productInfoWrapper: null,
+    snapAnimations: [],
+    sliderSlots: [],
+    sliderDraggingSlotIndex: null,
+    pendingSliderDragSlotIndex: null,
+    sliderFixedWidth: null,
+    sliderFixedHeight: null,
+    sliderGap: 12,
+sliderRefDifficulty: "p56",
+sliderFixedWidth: null,
+sliderFixedHeight: null
+},
+
+        DIFFICULTY_LEVELS: {
+            p30: { cols: 2, rows: 2 },
+            p56: { cols: 7, rows: 8 },
+            p99: { cols: 9, rows: 11 },
+            p143: { cols: 11, rows: 13 },
+            p304: { cols: 16, rows: 19 },
+        },
+        rng() {
+            if (!this.state.useSeed) return Math.random();
+            let t = (this.state.rngSeed += 0x6d2b79f5);
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        },
+        checkMobileView() {
+            this.state.isMobile = window.innerWidth < 750;
+        },
+        throttle(func, limit) {
+            let inThrottle;
+            return function () {
+                if (!inThrottle) {
+                    func.apply(this, arguments);
+                    inThrottle = true;
+                    setTimeout(() => (inThrottle = false), limit);
+                }
+            };
+        },
+        debounce(func, wait) {
+            let timeout;
+            return function () {
+                clearTimeout(timeout);
+                const args = arguments;
+                const ctx = this;
+                timeout = setTimeout(() => func.apply(ctx, args), wait);
+            };
+        },
+        markDirtyBoard() {
+            this.state.dirty = true;
+            this.state.dirtyBoard = true;
+            this.ensureGameLoop();
+        },
+        markDirtySlider() {
+            this.state.dirty = true;
+            this.state.dirtySlider = true;
+            this.ensureGameLoop();
+        },
+        markDirtyAll() {
+            this.state.dirty = true;
+            this.state.dirtyBoard = true;
+            this.state.dirtySlider = true;
+            this.ensureGameLoop();
+        },
+      async initAudio(){
+ if(this.state.audioCtx)return;
+ this.state.audioCtx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"});
+ await this.state.audioCtx.resume();
+ const r=await fetch("https://cdn.shopify.com/s/files/1/0851/3585/1868/files/Puzzle_4.mp3?v=1753056093");
+ const b=await r.arrayBuffer();
+ this.state.connectSoundBuffer=await this.state.audioCtx.decodeAudioData(b);
+ this.state.masterGain=this.state.audioCtx.createGain();
+ this.state.masterGain.connect(this.state.audioCtx.destination);
+ this.startKeepAlive();
+},
+_playSound(name){
+ const s=this.state;
+ if(name==="connect"&&s.connectSoundBuffer&&s.audioCtx&&s.audioCtx.state==="running"){
+  const src=s.audioCtx.createBufferSource();
+  src.buffer=s.connectSoundBuffer;
+  src.connect(s.masterGain||s.audioCtx.destination);
+  src.start(s.audioCtx.currentTime);
+ }
+},
+startKeepAlive(){
+    if(!this.state.audioCtx||this.state.keepAliveOsc) return;
+    const o=this.state.audioCtx.createOscillator();
+    o.frequency.value=20;
+    const g=this.state.audioCtx.createGain();
+    g.gain.value=0.0001;
+    o.connect(g).connect(this.state.masterGain||this.state.audioCtx.destination);
+    o.start();
+    this.state.keepAliveOsc=o;
+},
+        generatePuzzleShape(connections, w, h) {
+            const tabW = w * 0.25,
+                tabH = h * 0.25,
+                neckW = w * 0.1,
+                neckH = h * 0.1,
+                segs = [];
+            segs.push("M 0,0");
+            if (connections.top === "out") {
+                const mid = w / 2;
+                segs.push(`L ${mid - neckW},0 C ${mid - neckW},-${tabH * 0.3} ${mid - tabW},-${tabH} ${mid},-${tabH} C ${mid + tabW},-${tabH} ${mid + neckW},-${tabH * 0.3} ${mid + neckW},0 L ${w},0`);
+            } else if (connections.top === "in") {
+                const mid = w / 2;
+                segs.push(`L ${mid - neckW},0 C ${mid - neckW},${tabH * 0.3} ${mid - tabW},${tabH} ${mid},${tabH} C ${mid + tabW},${tabH} ${mid + neckW},${tabH * 0.3} ${mid + neckW},0 L ${w},0`);
+            } else segs.push(`L ${w},0`);
+            if (connections.right === "out") {
+                const mid = h / 2;
+                segs.push(`L ${w},${mid - neckH} C ${w + tabW * 0.3},${mid - neckH} ${w + tabW},${mid - tabH} ${w + tabW},${mid} C ${w + tabW},${mid + tabH} ${w + tabW * 0.3},${mid + neckH} ${w},${mid + neckH} L ${w},${h}`);
+            } else if (connections.right === "in") {
+                const mid = h / 2;
+                segs.push(`L ${w},${mid - neckH} C ${w - tabW * 0.3},${mid - neckH} ${w - tabW},${mid - tabH} ${w - tabW},${mid} C ${w - tabW},${mid + tabH} ${w - tabW * 0.3},${mid + neckH} ${w},${mid + neckH} L ${w},${h}`);
+            } else segs.push(`L ${w},${h}`);
+            if (connections.bottom === "out") {
+                const mid = w / 2;
+                segs.push(`L ${mid + neckW},${h} C ${mid + neckW},${h + tabH * 0.3} ${mid + tabW},${h + tabH} ${mid},${h + tabH} C ${mid - tabW},${h + tabH} ${mid - neckW},${h + tabH * 0.3} ${mid - neckW},${h} L 0,${h}`);
+            } else if (connections.bottom === "in") {
+                const mid = w / 2;
+                segs.push(`L ${mid + neckW},${h} C ${mid + neckW},${h - tabH * 0.3} ${mid + tabW},${h - tabH} ${mid},${h - tabH} C ${mid - tabW},${h - tabH} ${mid - neckW},${h - tabH * 0.3} ${mid - neckW},${h} L 0,${h}`);
+            } else segs.push(`L 0,${h}`);
+            if (connections.left === "out") {
+                const mid = h / 2;
+                segs.push(`L 0,${mid + neckH} C -${tabW * 0.3},${mid + neckH} -${tabW},${mid + tabH} -${tabW},${mid} C -${tabW},${mid - tabH} -${tabW * 0.3},${mid - neckH} 0,${mid - neckH} L 0,0`);
+            } else if (connections.left === "in") {
+                const mid = h / 2;
+                segs.push(`L 0,${mid + neckH} C ${tabW * 0.3},${mid + neckH} ${tabW},${mid + tabH} ${tabW},${mid} C ${tabW},${mid - tabH} ${tabW * 0.3},${mid - neckH} 0,${mid - neckH} L 0,0`);
+            } else segs.push(`L 0,0`);
+            segs.push("Z");
+            return segs.join(" ");
+        },
+        generateConnections(cols, rows) {
+            const connections = {},
+                layout = [];
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const id = r * cols + c;
+                    layout.push({ id, row: r, col: c });
+                    connections[id] = { top: null, right: null, bottom: null, left: null };
+                }
+            }
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const id = r * cols + c;
+                    if (r > 0) {
+                        const topId = (r - 1) * cols + c;
+                        if (connections[topId].bottom === null) connections[topId].bottom = this.rng() > 0.5 ? "out" : "in";
+                        connections[id].top = connections[topId].bottom === "out" ? "in" : "out";
+                    }
+                    if (c > 0) {
+                        const leftId = r * cols + (c - 1);
+                        if (connections[leftId].right === null) connections[leftId].right = this.rng() > 0.5 ? "out" : "in";
+                        connections[id].left = connections[leftId].right === "out" ? "in" : "out";
+                    }
+                    if (c < cols - 1) connections[id].right = this.rng() > 0.5 ? "out" : "in";
+                    if (r < rows - 1) connections[id].bottom = this.rng() > 0.5 ? "out" : "in";
+                }
+            }
+            return { connections, layout };
+        },
+      initSliderReference() {
+    const refKey = this.state.sliderRefDifficulty || "p56";
+    const refLevel = this.DIFFICULTY_LEVELS[refKey];
+    let refCols = refLevel.cols;
+    let refRows = refLevel.rows;
+    if (this.state.image.aspectRatio > 1) {
+        refCols = refLevel.rows;
+        refRows = refLevel.cols;
+    }
+    const availW = this.state.gameAreaRect.width - 20;
+    const availH = this.state.gameAreaRect.height - this.state.sliderHeight - 20;
+    let refBoardW = availW;
+    let refBoardH = refBoardW / this.state.image.aspectRatio;
+    if (refBoardH > availH) {
+        refBoardH = availH;
+        refBoardW = refBoardH * this.state.image.aspectRatio;
+    }
+    this.state.sliderRefCols = refCols;
+    this.state.sliderRefRows = refRows;
+    this.state.sliderRefPieceWidth = refBoardW / refCols;
+    this.state.sliderRefPieceHeight = refBoardH / refRows;
+    this.state.sliderFixedWidth = this.state.sliderRefPieceWidth;
+    this.state.sliderFixedHeight = this.state.sliderRefPieceHeight;
+},
+
+        createPuzzlePieces() {
+    if (!this.state.image || !this.state.gameAreaRect) return;
+    let level = this.DIFFICULTY_LEVELS[this.state.difficulty];
+    if (this.state.difficulty === "p200") {
+        level = this.adjustExactFactor(level.cols, level.rows, 200);
+    }
+    let cols, rows;
+    if (this.state.image.aspectRatio > 1) {
+        cols = level.rows;
+        rows = level.cols;
+    } else {
+        cols = level.cols;
+        rows = level.rows;
+    }
+    const { connections, layout } = this.generateConnections(cols, rows);
+    const maxW = this.state.gameAreaRect.width - 20;
+    const maxH = this.state.isMobile ? this.state.gameAreaRect.height - this.state.sliderHeight - 20 : this.state.gameAreaRect.height - 20;
+    let boardWidth = maxW;
+    let boardHeight = boardWidth / this.state.image.aspectRatio;
+    if (boardHeight > maxH) {
+        boardHeight = maxH;
+        boardWidth = boardHeight * this.state.image.aspectRatio;
+    }
+    const pieceWidth = boardWidth / cols;
+    const pieceHeight = boardHeight / rows;
+    this.state.SNAP_DISTANCE = Math.min(Math.max(Math.min(pieceWidth, pieceHeight) * 0.6, 10), 32);
+    const gameArea = this.state.gameAreaRect;
+    const gameAreaHeight = this.state.isMobile ? gameArea.height - this.state.sliderHeight : gameArea.height;
+    const centerX = gameArea.width / 2;
+    const centerY = gameAreaHeight / 2;
+    const targetX = centerX - boardWidth / 2;
+    const targetY = centerY - boardHeight / 2;
+    this.state.targetPosition = { x: targetX, y: targetY, width: boardWidth, height: boardHeight };
+    this.state.pieces = layout.map(({ id, row, col }) => {
+        const shape = this.generatePuzzleShape(connections[id], pieceWidth, pieceHeight);
+        return {
+            id,
+            row,
+            col,
+            shape,
+            path2D: new Path2D(shape),
+            connections: connections[id],
+            x: targetX + col * pieceWidth,
+            y: targetY + row * pieceHeight,
+            correctX: targetX + col * pieceWidth,
+            correctY: targetY + row * pieceHeight,
+            groupId: id,
+            zIndex: id + 1,
+            isFixed: false,
+            inSlider: false,
+            neighbors: { top: row > 0 ? (row - 1) * cols + col : null, right: col < cols - 1 ? id + 1 : null, bottom: row < rows - 1 ? (row + 1) * cols + col : null, left: col > 0 ? id - 1 : null },
+            boardWidth,
+            boardHeight,
+            pieceWidth,
+            pieceHeight,
+            bbox: { x: 0, y: 0, w: pieceWidth, h: pieceHeight }
+        };
+    });
+    if (this.state.isMobile) this.initSliderReference();
+    this.state.groups = this.state.pieces.map(p => ({ id: p.groupId, pieces: [p.id], fringe: new Set([p.id]) }));
+    this.rebuildIndexes();
+    this.state.pieceCache.clear();
+    this.state.pieceCacheOrder.length = 0;
+    this.state.gameStarted = false;
+    this.state.sliderScrollX = 0;
+    this.state.dirty = true;
+    this.state.dirtyBoard = true;
+    this.state.dirtySlider = true;
+    this.buildSpatialGrid();
+    this.stopGameLoop();
+    this.ensureGameLoop();
+},
+
+
+        rebuildIndexes() {
+            this.state.pieceById.clear();
+            this.state.groupById.clear();
+            this.state.piecesByGroup.clear();
+            this.state.openEdgesByGroup.clear();
+            this.state.maxZ = 0;
+            for (const p of this.state.pieces) {
+                this.state.pieceById.set(p.id, p);
+                if (p.zIndex > this.state.maxZ) this.state.maxZ = p.zIndex;
+            }
+            for (const g of this.state.groups) {
+                this.state.groupById.set(g.id, g);
+                this.state.piecesByGroup.set(g.id, new Set(g.pieces));
+                const fringe = new Set(g.pieces);
+                this.state.openEdgesByGroup.set(g.id, fringe);
+            }
+        },
+        buildSpatialGrid() {
+            const tp = this.state.targetPosition;
+            if (!tp) return;
+            const minSize = Math.min(this.state.pieces[0]?.pieceWidth || 50, this.state.pieces[0]?.pieceHeight || 50);
+            this.state.gridCellSize = Math.max(32, Math.floor(minSize));
+            this.state.gridMap.clear();
+            for (const p of this.state.pieces) this.insertPieceToGrid(p);
+        },
+        insertPieceToGrid(piece) {
+            const size = this.state.gridCellSize;
+            const minCol = Math.floor(piece.x / size);
+            const maxCol = Math.floor((piece.x + piece.pieceWidth) / size);
+            const minRow = Math.floor(piece.y / size);
+            const maxRow = Math.floor((piece.y + piece.pieceHeight) / size);
+            for (let r = minRow; r <= maxRow; r++) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    const key = r + ":" + c;
+                    let bucket = this.state.gridMap.get(key);
+                    if (!bucket) {
+                        bucket = new Set();
+                        this.state.gridMap.set(key, bucket);
+                    }
+                    bucket.add(piece.id);
+                }
+            }
+        },
+        updatePieceInGrid(piece, oldX, oldY) {
+            const size = this.state.gridCellSize;
+            const oldMinCol = Math.floor(oldX / size);
+            const oldMaxCol = Math.floor((oldX + piece.pieceWidth) / size);
+            const oldMinRow = Math.floor(oldY / size);
+            const oldMaxRow = Math.floor((oldY + piece.pieceHeight) / size);
+            const newMinCol = Math.floor(piece.x / size);
+            const newMaxCol = Math.floor((piece.x + piece.pieceWidth) / size);
+            const newMinRow = Math.floor(piece.y / size);
+            const newMaxRow = Math.floor((piece.y + piece.pieceHeight) / size);
+            if (oldMinCol === newMinCol && oldMaxCol === newMaxCol && oldMinRow === newMinRow && oldMaxRow === newMaxRow) return;
+            for (let r = oldMinRow; r <= oldMaxRow; r++)
+                for (let c = oldMinCol; c <= oldMaxCol; c++) {
+                    const key = r + ":" + c;
+                    const bucket = this.state.gridMap.get(key);
+                    if (bucket) bucket.delete(piece.id);
+                }
+            for (let r = newMinRow; r <= newMaxRow; r++)
+                for (let c = newMinCol; c <= newMaxCol; c++) {
+                    const key = r + ":" + c;
+                    let bucket = this.state.gridMap.get(key);
+                    if (!bucket) {
+                        bucket = new Set();
+                        this.state.gridMap.set(key, bucket);
+                    }
+                    bucket.add(piece.id);
+                }
+        },
+        initPuzzle(url) {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                this.state.image = { src: img.src, width: img.width, height: img.height, aspectRatio: img.width / img.height, element: img };
+                this.createPuzzlePieces();
+            };
+            img.src = url;
+        },
+   shufflePieces() {
+    if (!this.state.pieces.length) return;
+    this.checkMobileView();
+    if (this.state.isMobile) {
+        this.initSliderReference();
+        const w = this.state.sliderFixedWidth;
+        const h = this.state.sliderFixedHeight;
+        this.state.pieces.forEach(p => {
+            p.inSlider = true;
+            p.isFixed = false;
+            p.draggingFromSlider = false;
+            p.forceRenderOutside = false;
+            p.displayW = w;
+            p.displayH = h;
+        });
+        this.state.sliderSlots = this.state.pieces.map(p => p.id);
+        this.state.sliderDraggingSlotIndex = null;
+        this.state.pendingSliderDragSlotIndex = null;
+        this.state.sliderScrollX = 0;
+        this.markDirtySlider();
+        return;
+    }
+    const gameArea = this.state.gameAreaRect;
+    const centerX = gameArea.width / 2;
+    const centerY = gameArea.height / 2;
+    const targetX = centerX - this.state.targetPosition.width / 2;
+    const targetY = centerY - this.state.targetPosition.height / 2;
+    const margin = 40;
+    const spacing = 20;
+    const pieceWidth = this.state.pieces[0].pieceWidth;
+    const pieceHeight = this.state.pieces[0].pieceHeight;
+    const areas = [];
+    if (targetX > pieceWidth + margin) areas.push({ x: spacing, y: spacing, width: targetX - margin - spacing, height: gameArea.height - spacing * 2 });
+    if (gameArea.width - (targetX + this.state.targetPosition.width) > pieceWidth + margin)
+        areas.push({ x: targetX + this.state.targetPosition.width + margin, y: spacing, width: gameArea.width - (targetX + this.state.targetPosition.width + margin) - spacing, height: gameArea.height - spacing * 2 });
+    if (targetY > pieceHeight + margin) areas.push({ x: spacing, y: spacing, width: gameArea.width - spacing * 2, height: targetY - margin - spacing });
+    if (gameArea.height - (targetY + this.state.targetPosition.height) > pieceHeight + margin)
+        areas.push({ x: spacing, y: targetY + this.state.targetPosition.height + margin, width: gameArea.width - spacing * 2, height: gameArea.height - (targetY + this.state.targetPosition.height + margin) - spacing });
+    if (!areas.length) {
+        areas.push({ x: spacing, y: spacing, width: 200, height: gameArea.height - spacing * 2 });
+        areas.push({ x: gameArea.width - 200 - spacing, y: spacing, width: 200, height: gameArea.height - spacing * 2 });
+    }
+    let pos = { areaIndex: 0, x: areas[0].x, y: areas[0].y, maxHeight: 0 };
+    for (const piece of this.state.pieces) {
+        piece.inSlider = false;
+        const area = areas[pos.areaIndex];
+        if (pos.x + pieceWidth + spacing > area.x + area.width) {
+            pos.x = area.x;
+            pos.y += pos.maxHeight + spacing;
+            pos.maxHeight = 0;
+            if (pos.y + pieceHeight + spacing > area.y + area.height) {
+                pos.areaIndex = (pos.areaIndex + 1) % areas.length;
+                pos.x = areas[pos.areaIndex].x;
+                pos.y = areas[pos.areaIndex].y;
+            }
+        }
+        const nx = pos.x + (this.rng() - 0.5) * pieceWidth * 0.3;
+        const ny = pos.y + (this.rng() - 0.5) * pieceHeight * 0.3;
+        const oldX = piece.x;
+        const oldY = piece.y;
+        piece.x = nx;
+        piece.y = ny;
+        pos.x += pieceWidth + spacing;
+        pos.maxHeight = Math.max(pos.maxHeight, pieceHeight);
+        this.updatePieceInGrid(piece, oldX, oldY);
+    }
+    this.markDirtyBoard();
+    this.buildSpatialGrid();
+},
+
+
+
+
+        resetPuzzle() {
+            if (!this.state.image) return;
+            this.state.pieces = [];
+            this.state.groups = [];
+            this.state.isComplete = false;
+            this.state.showPreview = false;
+            this.state.pieceCache.clear();
+            this.state.pieceCacheOrder.length = 0;
+            this.state.sliderScrollX = 0;
+            this.stopTimer();
+            const disp = document.getElementById("timer-display");
+            if (disp) disp.textContent = "00:00";
+            this.createPuzzlePieces();
+        },
+        resetToMainMenu() {
+            this.stopTimer();
+            this.state.gameStarted = false;
+            this.state.isComplete = false;
+            const comp = document.getElementById("puzzle-complete");
+            if (comp) comp.style.display = "none";
+            const controls = document.querySelector(".puzzle-controls");
+            if (controls) controls.style.display = "none";
+            const setup = document.getElementById("puzzle-setup-controls");
+            if (setup) setup.style.display = "flex";
+            this.state.difficulty = "p56";
+            const pills = document.querySelector(".puzzle-difficulty-pills");
+            if (pills) {
+                pills.querySelector(".active")?.classList.remove("active");
+                pills.querySelector('[data-difficulty="p56"]').classList.add("active");
+            }
+            this.resetPuzzle();
+            this.markDirtyAll();
+        },
+        startPuzzle() {
+            if (this.state.gameStarted) return;
+            this.state.gameStarted = true;
+            this.shufflePieces();
+            this.startTimer();
+            this.ensureGameLoop();
+        },
+        startTimer() {
+            if (this.state.timerInterval) clearInterval(this.state.timerInterval);
+            this.state.startTime = Date.now();
+            this.state.timerInterval = setInterval(this.updateTimer.bind(this), 1000);
+        },
+        updateTimer() {
+            if (!this.state.startTime) return;
+            const elapsed = Math.floor((Date.now() - this.state.startTime) / 1000);
+            const m = Math.floor(elapsed / 60);
+            const s = elapsed % 60;
+            const el = document.getElementById("timer-display");
+            if (el) el.textContent = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        },
+        stopTimer() {
+            if (this.state.timerInterval) {
+                clearInterval(this.state.timerInterval);
+                this.state.timerInterval = null;
+            }
+        },
+        togglePreview() {
+            this.state.showPreview = !this.state.showPreview;
+            const btn = document.querySelector(".puzzle-btn-preview");
+            if (btn) {
+                if (this.state.showPreview) btn.classList.add("active");
+                else btn.classList.remove("active");
+            }
+            this.markDirtyBoard();
+        },
+        handleMouseDown(e) {
+    if (!this.state.gameStarted || this.state.interactionMode !== "IDLE") return;
+    const rect = this.state.gameAreaRect;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    this.state.interactionStartPos = { x, y };
+    this.state.interactionLastPos = { x, y };
+    if (this.state.scrollAnimationId) {
+        cancelAnimationFrame(this.state.scrollAnimationId);
+        this.state.scrollAnimationId = null;
+    }
+    if (this.state.isMobile) {
+        const sliderBounds = this.getSliderBounds();
+        if (sliderBounds && y >= sliderBounds.y) {
+            if (this.state.sliderSlots && this.state.sliderSlots.length) {
+                for (let i = this.state.sliderSlots.length - 1; i >= 0; i--) {
+                    if (i === this.state.sliderDraggingSlotIndex) continue;
+                    const pid = this.state.sliderSlots[i];
+                    const piece = this.state.pieceById.get(pid);
+                    if (!piece || piece.isFixed || !piece.inSlider) continue;
+                    const pos = this.getPieceSliderSlotPosition(piece, i);
+                    if (!pos) continue;
+                    if (x >= pos.x && x <= pos.x + pos.w && y >= pos.y && y <= pos.y + pos.h) {
+                        if (this.state.ctx.isPointInPath(piece.path2D, x - pos.x, y - pos.y)) {
+                            this.state.clickedPiece = piece;
+                            this.state.pendingSliderDragSlotIndex = i;
+                            this.state.longPressTimer = setTimeout(() => {
+                                this._startDrag(x, y, true);
+                            }, this.state.LONG_PRESS_DURATION);
+                            return;
+                        }
+                    }
+                }
+            }
+            this.state.interactionMode = "SCROLLING";
+            return;
+        }
+    }
+    const candidates = this.getHitCandidates(x, y);
+    let hit = null;
+    for (let i = candidates.length - 1; i >= 0; i--) {
+        const p = candidates[i];
+        if (p.isFixed || p.inSlider) continue;
+        if (x >= p.x && x <= p.x + p.pieceWidth && y >= p.y && y <= p.y + p.pieceHeight) {
+            if (this.state.ctx.isPointInPath(p.path2D, x - p.x, y - p.y)) {
+                hit = p;
+                break;
+            }
+        }
+    }
+    if (hit) {
+        this.state.clickedPiece = hit;
+        this._startDrag(x, y, false);
+    }
+},
+
+        getHitCandidates(x, y) {
+            const size = this.state.gridCellSize;
+            const c = Math.floor(x / size);
+            const r = Math.floor(y / size);
+            const out = [];
+            for (let rr = r - 1; rr <= r + 1; rr++) {
+                for (let cc = c - 1; cc <= c + 1; cc++) {
+                    const key = rr + ":" + cc;
+                    const bucket = this.state.gridMap.get(key);
+                    if (!bucket) continue;
+                    for (const id of bucket) {
+                        const p = this.state.pieceById.get(id);
+                        if (p && !out.includes(p)) out.push(p);
+                    }
+                }
+            }
+            if (!out.length) {
+                for (const p of this.state.pieces) out.push(p);
+            }
+            out.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+            return out;
+        },
+        _startDrag(x, y, fromSlider) {
+    if (!this.state.clickedPiece) return;
+    this.state.interactionMode = "DRAGGING";
+    const piece = this.state.clickedPiece;
+    const group = this.state.groupById.get(piece.groupId);
+    if (!group) return;
+    this.state.draggedGroup = group;
+    this.state.maxZ += 2;
+    for (const id of group.pieces) {
+        const p = this.state.pieceById.get(id);
+        if (p) {
+            p.zIndex = this.state.maxZ;
+        }
+    }
+    if (fromSlider) {
+        const slotIndex = this.state.pendingSliderDragSlotIndex;
+        this.state.sliderDraggingSlotIndex = slotIndex;
+        piece.draggingFromSlider = true;
+        piece.forceRenderOutside = true;
+        this.state.dragOffset = { x: piece.pieceWidth / 2, y: piece.pieceHeight / 2 };
+        const nx = x - this.state.dragOffset.x;
+        const ny = y - this.state.dragOffset.y;
+        const dx = nx - piece.x;
+        const dy = ny - piece.y;
+        for (const id of group.pieces) {
+            const p = this.state.pieceById.get(id);
+            if (p) {
+                const ox = p.x;
+                const oy = p.y;
+                p.x += dx;
+                p.y += dy;
+                this.updatePieceInGrid(p, ox, oy);
+            }
+        }
+    } else {
+        this.state.dragOffset = { x: x - piece.x, y: y - piece.y };
+    }
+    this.state.canvas.classList.add("dragging");
+    if (this.state.longPressTimer) {
+        clearTimeout(this.state.longPressTimer);
+        this.state.longPressTimer = null;
+    }
+    this.markDirtyBoard();
+    this.markDirtySlider();
+},
+        handleMouseMove(e) {
+            if (this.state.interactionMode === "IDLE" && !this.state.longPressTimer) return;
+            const rect = this.state.gameAreaRect;
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            if (this.state.longPressTimer) {
+                const dx = x - this.state.interactionStartPos.x;
+                const dy = y - this.state.interactionStartPos.y;
+                if (Math.abs(dx) > this.state.SWIPE_THRESHOLD || Math.abs(dy) > this.state.SWIPE_THRESHOLD) {
+                    clearTimeout(this.state.longPressTimer);
+                    this.state.longPressTimer = null;
+                    this.state.interactionMode = "SCROLLING";
+                }
+            }
+            switch (this.state.interactionMode) {
+                case "DRAGGING": {
+                    if (!this.state.draggedGroup || !this.state.clickedPiece) break;
+                    const nx = x - this.state.dragOffset.x;
+                    const ny = y - this.state.dragOffset.y;
+                    const dx = nx - this.state.clickedPiece.x;
+                    const dy = ny - this.state.clickedPiece.y;
+                    if (dx || dy) {
+                        for (const id of this.state.draggedGroup.pieces) {
+                            const p = this.state.pieceById.get(id);
+                            if (p) {
+                                const ox = p.x,
+                                    oy = p.y;
+                                p.x += dx;
+                                p.y += dy;
+                                this.updatePieceInGrid(p, ox, oy);
+                            }
+                        }
+                        this.markDirtyBoard();
+                    }
+                    break;
+                }
+                case "SCROLLING": {
+                    const delta = x - this.state.interactionLastPos.x;
+                    if (delta) {
+                        this.state.sliderScrollX -= delta;
+                        this.state.sliderScrollVelocity = -delta;
+                        const sliderPieces = this.state.pieces.filter((p) => p.inSlider);
+                        if (sliderPieces.length > 0) {
+                            const totalWidth = sliderPieces.length * (sliderPieces[0].pieceWidth + this.state.sliderPieceSpacing) - this.state.sliderPieceSpacing + this.state.sliderPadding * 2;
+                            const maxScroll = Math.max(0, totalWidth - this.state.canvas.width / this.state.dpr);
+                            if (this.state.sliderScrollX < 0) this.state.sliderScrollX = 0;
+                            if (this.state.sliderScrollX > maxScroll) this.state.sliderScrollX = maxScroll;
+                        }
+                        this.markDirtySlider();
+                    }
+                    break;
+                }
+            }
+            this.state.interactionLastPos = { x, y };
+        },
+        handleMouseUp() {
+    if (this.state.longPressTimer) {
+        clearTimeout(this.state.longPressTimer);
+        this.state.longPressTimer = null;
+    }
+    if (this.state.interactionMode === "DRAGGING") {
+        if (this.state.draggedGroup && this.state.clickedPiece) {
+            const sliderBounds = this.getSliderBounds();
+            const pieceCenterY = this.state.clickedPiece.y + this.state.clickedPiece.pieceHeight / 2;
+            if (this.state.isMobile && sliderBounds && pieceCenterY > sliderBounds.y) {
+                const g = this.state.draggedGroup;
+                for (const id of g.pieces) {
+                    const p = this.state.pieceById.get(id);
+                    if (!p) continue;
+                    p.draggingFromSlider = false;
+                    p.forceRenderOutside = false;
+                    p.inSlider = true;
+                }
+                this.state.sliderDraggingSlotIndex = null;
+                this.state.pendingSliderDragSlotIndex = null;
+                this.markDirtySlider();
+                this.markDirtyBoard();
+            } else {
+                const g = this.state.draggedGroup;
+                for (const id of g.pieces) {
+                    const p = this.state.pieceById.get(id);
+                    if (!p) continue;
+                    p.inSlider = false;
+                    p.draggingFromSlider = false;
+                    p.forceRenderOutside = false;
+                }
+                if (this.state.sliderDraggingSlotIndex !== null) {
+                    this.state.sliderSlots.splice(this.state.sliderDraggingSlotIndex, 1);
+                }
+                this.state.sliderDraggingSlotIndex = null;
+                this.state.pendingSliderDragSlotIndex = null;
+                this.tryGroupSnap(g);
+                this.checkConnections();
+                this.markDirtyAll();
+            }
+        }
+        this.state.canvas.classList.remove("dragging");
+    } else if (this.state.interactionMode === "SCROLLING") {
+        this.startSliderMomentum();
+    }
+    this.state.interactionMode = "IDLE";
+    this.state.draggedGroup = null;
+    this.state.clickedPiece = null;
+    this.state.interactionStartPos = null;
+    this.ensureGameLoop();
+},
+        handleTouchStart(e) {
+            if (!this.state.gameStarted) return;
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                const t = e.touches[0];
+                this.handleMouseDown({ clientX: t.clientX, clientY: t.clientY });
+            }
+        },
+        getSliderBounds() {
+            if (!this.state.isMobile || !this.state.canvas) return null;
+            return { x: 0, y: this.state.canvas.height / this.state.dpr - this.state.sliderHeight, width: this.state.canvas.width / this.state.dpr, height: this.state.sliderHeight };
+        },
+      getSliderTotalWidth() {
+    if (!this.state.sliderSlots.length || this.state.sliderFixedWidth == null) return 0;
+    const w = this.state.sliderFixedWidth;
+    const g = this.state.sliderGap;
+    const n = this.state.sliderSlots.length;
+    return n * w + (n - 1) * g + this.state.sliderPadding * 2;
+},
+
+        getPieceSliderPosition(piece, index) {
+            const bounds = this.getSliderBounds();
+            if (!bounds) return null;
+            const w = piece.pieceWidth,
+                h = piece.pieceHeight;
+            const x = this.state.sliderPadding + index * (w + this.state.sliderPieceSpacing) - this.state.sliderScrollX;
+            const y = bounds.y + (bounds.height - h) / 2;
+            return { x, y };
+        },
+renderSliderPiece(ctx, piece, slotPos) {
+    const w = this.state.sliderFixedWidth;
+    const h = this.state.sliderFixedHeight;
+    const scaleX = w / piece.pieceWidth;
+    const scaleY = h / piece.pieceHeight;
+    ctx.save();
+    ctx.translate(slotPos.x, slotPos.y);
+    ctx.scale(scaleX, scaleY);
+    const ox = piece.x;
+    const oy = piece.y;
+    piece.x = 0;
+    piece.y = 0;
+    this.renderPiece(ctx, piece);
+    piece.x = ox;
+    piece.y = oy;
+    ctx.restore();
+},
+
+
+
+getPieceSliderSlotPosition(piece, slotIndex) {
+    const bounds = this.getSliderBounds();
+    if (!bounds) return null;
+    const w = this.state.sliderFixedWidth;
+    const h = this.state.sliderFixedHeight;
+    const x = this.state.sliderPadding + slotIndex * (w + this.state.sliderGap) - this.state.sliderScrollX;
+    const y = bounds.y + (bounds.height - h) / 2;
+    return { x, y, w, h };
+},
+
+
+        startSliderMomentum() {
+    if (Math.abs(this.state.sliderScrollVelocity) < 0.5) return;
+    const animate = () => {
+        if (Math.abs(this.state.sliderScrollVelocity) < 0.5 || this.state.interactionMode !== "IDLE") {
+            if (this.state.scrollAnimationId) cancelAnimationFrame(this.state.scrollAnimationId);
+            this.state.scrollAnimationId = null;
+            return;
+        }
+        this.state.sliderScrollX += this.state.sliderScrollVelocity;
+        this.state.sliderScrollVelocity *= 0.95;
+        const maxScroll = Math.max(0, this.getSliderTotalWidth() - (this.state.canvas.width / this.state.dpr));
+        if (this.state.sliderScrollX < 0) {
+            this.state.sliderScrollX = 0;
+            this.state.sliderScrollVelocity = 0;
+        }
+        if (this.state.sliderScrollX > maxScroll) {
+            this.state.sliderScrollX = maxScroll;
+            this.state.sliderScrollVelocity = 0;
+        }
+        this.markDirtySlider();
+        this.state.scrollAnimationId = requestAnimationFrame(animate);
+    };
+    if (this.state.scrollAnimationId) cancelAnimationFrame(this.state.scrollAnimationId);
+    this.state.scrollAnimationId = requestAnimationFrame(animate);
+    this.ensureGameLoop();
+},
+
+        canConnect(p1, p2, groupId) {
+            const r = p1.neighbors.right === p2.id;
+            const l = p1.neighbors.left === p2.id;
+            const b = p1.neighbors.bottom === p2.id;
+            const t = p1.neighbors.top === p2.id;
+            if (!r && !l && !b && !t) return null;
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const sd = this.state.SNAP_DISTANCE;
+            const dragged = p1.groupId === groupId;
+            let connection = null;
+            if (r && Math.abs(dx - p1.pieceWidth) < sd && Math.abs(dy) < sd) connection = { offsetX: p2.x - p1.pieceWidth - p1.x, offsetY: p2.y - p1.y };
+            else if (l && Math.abs(dx + p2.pieceWidth) < sd && Math.abs(dy) < sd) connection = { offsetX: p2.x + p2.pieceWidth - p1.x, offsetY: p2.y - p1.y };
+            else if (b && Math.abs(dy - p1.pieceHeight) < sd && Math.abs(dx) < sd) connection = { offsetX: p2.x - p1.x, offsetY: p2.y - p1.pieceHeight - p1.y };
+            else if (t && Math.abs(dy + p2.pieceHeight) < sd && Math.abs(dx) < sd) connection = { offsetX: p2.x - p1.x, offsetY: p2.y + p2.pieceHeight - p1.y };
+            if (connection && dragged) return { ...connection, movingGroup: p1.groupId, staticGroup: p2.groupId, movingPieceId: p1.id, staticPieceId: p2.id };
+            return null;
+        },
+        getFringePieces(group) {
+            const fringe = this.state.openEdgesByGroup.get(group.id);
+            const out = [];
+            if (fringe) {
+                for (const id of fringe) {
+                    const p = this.state.pieceById.get(id);
+                    if (p) out.push(p);
+                }
+            }
+            return out;
+        },
+        updateFringeAfterMerge(baseGroup, mergedPiecesIds) {
+            const fringe = this.state.openEdgesByGroup.get(baseGroup.id) || new Set();
+            for (const id of mergedPiecesIds) {
+                const p = this.state.pieceById.get(id);
+                if (!p) continue;
+                let open = false;
+                if (p.neighbors.top !== null && !mergedPiecesIds.includes(p.neighbors.top)) open = true;
+                if (p.neighbors.bottom !== null && !mergedPiecesIds.includes(p.neighbors.bottom)) open = true;
+                if (p.neighbors.left !== null && !mergedPiecesIds.includes(p.neighbors.left)) open = true;
+                if (p.neighbors.right !== null && !mergedPiecesIds.includes(p.neighbors.right)) open = true;
+                if (open) fringe.add(p.id);
+                else fringe.delete(p.id);
+            }
+            this.state.openEdgesByGroup.set(baseGroup.id, fringe);
+        },
+        checkConnections() {
+    const group = this.state.draggedGroup;
+    if (!group) return;
+    const groupPiecesSet = this.state.piecesByGroup.get(group.id);
+    if (!groupPiecesSet) return;
+    const fringePieces = this.getFringePieces(group);
+    for (const piece of fringePieces) {
+        const neighbors = [piece.neighbors.top, piece.neighbors.right, piece.neighbors.bottom, piece.neighbors.left].filter((v) => v !== null);
+        for (const nId of neighbors) {
+            const n = this.state.pieceById.get(nId);
+            if (!n || groupPiecesSet.has(n.id) || n.inSlider) continue;
+            const conn = this.canConnect(piece, n, group.id);
+            if (conn) {
+                this._playSound("connect");
+                this.mergeGroups(conn);
+                return;
+            }
+        }
+    }
+},
+        tryGroupSnap(group) {
+            const groupPiecesSet = this.state.piecesByGroup.get(group.id);
+            if (!groupPiecesSet) return false;
+            const pieces = [];
+            for (const id of groupPiecesSet) {
+                const p = this.state.pieceById.get(id);
+                if (p) pieces.push(p);
+            }
+            if (!pieces.length) return false;
+            const minRow = Math.min(...pieces.map((p) => p.row));
+            const minCol = Math.min(...pieces.map((p) => p.col));
+            const refs = pieces.map((p) => ({ x: p.x - (p.col - minCol) * p.pieceWidth, y: p.y - (p.row - minRow) * p.pieceHeight }));
+            const base = refs[0];
+            if (!refs.every((r) => Math.abs(r.x - base.x) < this.state.SNAP_DISTANCE && Math.abs(r.y - base.y) < this.state.SNAP_DISTANCE)) return false;
+            const cx = this.state.targetPosition.x + minCol * pieces[0].pieceWidth;
+            const cy = this.state.targetPosition.y + minRow * pieces[0].pieceHeight;
+            if (Math.abs(base.x - cx) < this.state.SNAP_DISTANCE && Math.abs(base.y - cy) < this.state.SNAP_DISTANCE) {
+                this._playSound("connect");
+                for (const p of pieces) {
+                    const ox = p.x,
+                        oy = p.y;
+                    p.x = cx + (p.col - minCol) * p.pieceWidth;
+                    p.y = cy + (p.row - minRow) * p.pieceHeight;
+                    p.isFixed = true;
+                    p.inSlider = false;
+                    this.updatePieceInGrid(p, ox, oy);
+                }
+                this.state.groups = this.state.groups.filter((g) => g.id !== group.id);
+                this.state.groupById.delete(group.id);
+                this.state.piecesByGroup.delete(group.id);
+                this.state.openEdgesByGroup.delete(group.id);
+                if (this.state.pieces.every((p) => p.isFixed)) this.completePuzzle();
+                this.markDirtyBoard();
+                return true;
+            }
+            return false;
+        },
+        mergeGroups(connection) {
+            const moving = this.state.groupById.get(connection.movingGroup);
+            const stat = this.state.groupById.get(connection.staticGroup);
+            if (!moving || !stat || moving.id === stat.id) return;
+            const anchor = this.state.pieceById.get(connection.staticPieceId);
+            if (!anchor) return;
+            const mergedIds = [...stat.pieces, ...moving.pieces];
+            const mergedPieces = mergedIds.map((id) => this.state.pieceById.get(id)).filter(Boolean);
+            for (const p of mergedPieces) {
+                const colDiff = p.col - anchor.col;
+                const rowDiff = p.row - anchor.row;
+                const oldX = p.x,
+                    oldY = p.y;
+                p.x = anchor.x + colDiff * p.pieceWidth;
+                p.y = anchor.y + rowDiff * p.pieceHeight;
+                p.groupId = stat.id;
+                this.updatePieceInGrid(p, oldX, oldY);
+            }
+            stat.pieces = mergedIds;
+            this.state.groupById.delete(moving.id);
+            this.state.piecesByGroup.delete(moving.id);
+            this.state.openEdgesByGroup.delete(moving.id);
+            this.state.groups = this.state.groups.filter((g) => g.id !== moving.id);
+            const newGroupPieceSet = new Set(stat.pieces);
+            this.state.piecesByGroup.set(stat.id, newGroupPieceSet);
+            this.updateFringeAfterMerge(stat, mergedIds);
+            if (this.state.pieces.every((p) => p.isFixed)) this.completePuzzle();
+            this.markDirtyBoard();
+        },
+        async completePuzzle() {
+    this.state.isComplete = true;
+    this.stopTimer();
+    this.triggerConfetti();
+
+    const elapsed = Math.floor((Date.now() - this.state.startTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    const timeEl = document.getElementById("puzzle-complete-time");
+    if (timeEl) timeEl.textContent = `Czas: ${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+
+    const c = document.getElementById("puzzle-complete");
+    if (c) c.style.display = "block";
+    
+    this.markDirtyBoard();
+
+    if (customerData && customerData.id) {
+        try {
+            // Try to create/get player
+            const playerResult = await PuzzleAPI.createPlayer(customerData.id);
+            
+            if (playerResult.success && playerResult.player) {
+                // Save score
+                await PuzzleAPI.saveScore(
+                    playerResult.player.id,
+                    productId,
+                    this.state.difficulty,
+                    elapsed
+                );
+                this.displayLeaderboard();
+            } else {
+                // Show nickname creation form
+                document.getElementById('leaderboard-container').style.display = 'none';
+                document.getElementById('create-nickname-container').style.display = 'block';
+
+                document.getElementById('save-nickname-btn').onclick = async () => {
+                    const input = document.getElementById('nickname-input');
+                    const newNickname = input.value.trim();
+                    if (newNickname) {
+                        try {
+                            const newPlayerResult = await PuzzleAPI.createPlayer(customerData.id, newNickname);
+                            if (newPlayerResult.success) {
+                                await PuzzleAPI.saveScore(
+                                    newPlayerResult.player.id,
+                                    productId,
+                                    this.state.difficulty,
+                                    elapsed
+                                );
+                                document.getElementById('create-nickname-container').innerHTML = `<p>Nazwa gracza '${newNickname}' została zapisana!</p>`;
+                                document.getElementById('leaderboard-container').style.display = 'block';
+                                this.displayLeaderboard();
+                            }
+                        } catch (error) {
+                            console.error('Error creating player:', error);
+                        }
+                    }
+                };
+            }
+        } catch (error) {
+            console.error('Error in puzzle completion:', error);
+        }
+    } else {
+        // GOŚĆ
+        document.getElementById('leaderboard-container').style.display = 'none';
+        const c = document.getElementById('puzzle-complete');
+        c.innerHTML += `
+            <div style="padding: 20px; text-align: center;">
+                <h4>Aby zapisać wynik, musisz mieć konto.</h4>
+                <a href="/account/login" class="puzzle-btn" style="text-decoration: none;">Zaloguj się</a>
+            </div>
+        `;
+    }
+},
+      
+        pieceCacheKey(piece) {
+            return `${piece.id}-${this.state.dpr}-${Math.round(piece.pieceWidth)}x${Math.round(piece.pieceHeight)}`;
+        },
+        enforcePieceCacheLimit() {
+            const limit = Math.ceil(this.state.pieces.length * this.state.pieceCacheLimitMultiplier);
+            while (this.state.pieceCacheOrder.length > limit) {
+                const k = this.state.pieceCacheOrder.shift();
+                if (k) this.state.pieceCache.delete(k);
+            }
+        },
+        renderPiece(ctx, piece) {
+            const key = this.pieceCacheKey(piece);
+            const dpr = this.state.dpr;
+            if (!this.state.pieceCache.has(key)) {
+                const off = document.createElement("canvas");
+                const octx = off.getContext("2d");
+                const pad = 30;
+                off.width = (piece.pieceWidth + pad * 2) * dpr;
+                off.height = (piece.pieceHeight + pad * 2) * dpr;
+                octx.scale(dpr, dpr);
+                octx.save();
+                octx.translate(pad, pad);
+                octx.clip(piece.path2D);
+                octx.drawImage(this.state.image.element, -piece.col * piece.pieceWidth, -piece.row * piece.pieceHeight, piece.boardWidth, piece.boardHeight);
+                octx.strokeStyle = this.state.gameStarted ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.1)";
+                octx.lineWidth = 1.5;
+                octx.stroke(piece.path2D);
+                octx.restore();
+                this.state.pieceCache.set(key, off);
+                this.state.pieceCacheOrder.push(key);
+                this.enforcePieceCacheLimit();
+            } else {
+                const idx = this.state.pieceCacheOrder.indexOf(key);
+                if (idx > -1) {
+                    this.state.pieceCacheOrder.splice(idx, 1);
+                    this.state.pieceCacheOrder.push(key);
+                }
+            }
+            const cached = this.state.pieceCache.get(key);
+            const pad = 30;
+            ctx.drawImage(cached, piece.x - pad, piece.y - pad, cached.width / dpr, cached.height / dpr);
+        },
+ renderMobileSlider(ctx) {
+    const bounds = this.getSliderBounds();
+    if (!bounds) return;
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    const dpr = this.state.dpr;
+    ctx.fillStyle = "#f8f8f8";
+    ctx.fillRect(bounds.x * dpr, bounds.y * dpr, bounds.width * dpr, bounds.height * dpr);
+    ctx.strokeStyle = "#e0e0e0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, bounds.y * dpr);
+    ctx.lineTo(bounds.width * dpr, bounds.y * dpr);
+    ctx.stroke();
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+    ctx.clip();
+    const ids = this.state.sliderSlots;
+    for (let i = 0; i < ids.length; i++) {
+        if (i === this.state.sliderDraggingSlotIndex) continue;
+        const piece = this.state.pieceById.get(ids[i]);
+        if (!piece || piece.isFixed || !piece.inSlider) continue;
+        const pos = this.getPieceSliderSlotPosition(piece, i);
+        if (!pos) continue;
+        if (pos.x + pos.w > 0 && pos.x < bounds.width) {
+            this.renderSliderPiece(ctx, piece, pos);
+        }
+    }
+    ctx.restore();
+},
+
+        render() {
+            if (!this.state.ctx || !this.state.canvas) return;
+            if (!this.state.dirty && this.state.snapAnimations.length === 0) return;
+            const start = performance.now();
+            const now = start;
+            if (now - this.state.lastRenderTime < this.state.targetRenderInterval && this.state.snapAnimations.length === 0) return;
+            this.state.lastRenderTime = now;
+            const ctx = this.state.ctx;
+            const canvas = this.state.canvas;
+            const dpr = this.state.dpr;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+            if (this.state.targetPosition && !this.state.isComplete) {
+                const pos = this.state.targetPosition;
+                if (this.state.showPreview) {
+                    ctx.globalAlpha = 0.3;
+                    ctx.drawImage(this.state.image.element, pos.x, pos.y, pos.width, pos.height);
+                    ctx.globalAlpha = 1;
+                } else {
+                    ctx.save();
+                    ctx.strokeStyle = "#dee2e6";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 5]);
+                    ctx.strokeRect(pos.x, pos.y, pos.width, pos.height);
+                    ctx.fillStyle = "#adb5bd";
+                    ctx.font = "500 24px Arial";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText("Ułóż puzzle tutaj", pos.x + pos.width / 2, pos.y + pos.height / 2);
+                    ctx.restore();
+                }
+            }
+            const piecesToDraw = this.state.pieces.slice().sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+            for (const p of piecesToDraw) {
+                if (!p.inSlider || !this.state.isMobile || !this.state.gameStarted || p.forceRenderOutside) this.renderPiece(ctx, p);
+            }
+            if (this.state.isMobile && this.state.gameStarted) this.renderMobileSlider(ctx);
+            const completeEl = document.getElementById("puzzle-complete");
+            if (completeEl) completeEl.style.display = this.state.isComplete ? "block" : "none";
+            this.state.dirty = false;
+            this.state.dirtyBoard = false;
+            this.state.dirtySlider = false;
+            const renderTime = performance.now() - start;
+            this.state.avgRenderTime = this.state.avgRenderTime * 0.9 + renderTime * 0.1;
+            const base = Math.max(this.state.avgRenderTime * 1.2, 12);
+            if (this.state.interactionMode === "IDLE" && !this.state.scrollAnimationId) {
+                this.state.targetRenderInterval = Math.max(base, 40);
+            } else {
+                this.state.targetRenderInterval = base;
+            }
+        },
+        gameLoop() {
+            this.state.animationFrameId = null;
+            this.render();
+            if (this.shouldContinueLoop()) this.state.animationFrameId = requestAnimationFrame(this.gameLoop.bind(this));
+        },
+        shouldContinueLoop() {
+            if (this.state.dirty) return true;
+            if (this.state.interactionMode !== "IDLE") return true;
+            if (this.state.scrollAnimationId) return true;
+            return false;
+        },
+        ensureGameLoop() {
+            if (!this.state.animationFrameId) {
+                this.state.animationFrameId = requestAnimationFrame(this.gameLoop.bind(this));
+            }
+        },
+        stopGameLoop() {
+            if (this.state.animationFrameId) {
+                cancelAnimationFrame(this.state.animationFrameId);
+                this.state.animationFrameId = null;
+            }
+        },
+        triggerConfetti() {
+            const fire = (o) => {
+                if (typeof confetti === "function") {
+                    confetti({ particleCount: 250, spread: 180, origin: o, zIndex: 9999 });
+                }
+            };
+            const run = () => {
+                setTimeout(() => fire({ x: 0.5, y: 0.5 }), 0);
+                setTimeout(() => fire({ x: Math.random(), y: Math.random() * 0.8 }), 250);
+                setTimeout(() => fire({ x: Math.random(), y: Math.random() * 0.8 }), 500);
+                setTimeout(() => fire({ x: Math.random(), y: Math.random() * 0.8 }), 750);
+            };
+            if (typeof confetti === "function") run();
+            else {
+                const s = document.createElement("script");
+                s.src = "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js";
+                s.onload = run;
+                document.head.appendChild(s);
+            }
+        },
+        _attachProductSection() {
+            const imgContainer = document.getElementById("puzzle-product-image-container");
+            const formContainer = document.getElementById("puzzle-product-form-container");
+            const wrapper = document.querySelector(".product__info-wrapper");
+            if (!wrapper || !formContainer) return;
+            if (!this.state.productInfoWrapper) {
+                this.state.productInfoWrapper = wrapper;
+                this.state.originalProductInfoParent = wrapper.parentElement;
+            }
+            if (imgContainer) {
+                imgContainer.innerHTML = `<img src="{{ puzzle_preview }}" srcset="{{ base_img | image_url: width:800 }} 1x, {{ base_img | image_url: width:1600 }} 2x, {{ base_img | image_url: width:2400 }} 3x" sizes="(max-width:750px) 90vw, 400px" alt="">`;
+            }
+            formContainer.innerHTML = "";
+            formContainer.appendChild(this.state.productInfoWrapper);
+            if (window.Shopify && window.Shopify.PaymentButton) {
+                window.Shopify.PaymentButton.init();
+            }
+        },
+        _openPuzzleModal_internal() {
+            const modal = document.getElementById("puzzle-modal");
+            modal.style.display = "flex";
+            document.body.style.overflow = "hidden";
+            this.checkMobileView();
+            const gameArea = document.getElementById("puzzle-game-area");
+            if (!gameArea) return;
+            const resize = () => {
+                if (!this.state.ctx) return;
+                const rect = gameArea.getBoundingClientRect();
+                if (!rect.width || !rect.height) return;
+                this.state.gameAreaRect = rect;
+                const dpr = this.state.dpr;
+                this.state.canvas.width = rect.width * dpr;
+                this.state.canvas.height = rect.height * dpr;
+                this.state.canvas.style.width = rect.width + "px";
+                this.state.canvas.style.height = rect.height + "px";
+                this.state.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                if (this.state.image) {
+                    this.state.pieceCache.clear();
+                    this.state.pieceCacheOrder.length = 0;
+                    this.createPuzzlePieces();
+                } else {
+                    this.initPuzzle("{{ puzzle_src }}");
+                }
+            };
+            this.resizeObserver = new ResizeObserver(resize);
+            this.resizeObserver.observe(gameArea);
+            this._attachProductSection();
+            resize();
+        },
+        closePuzzleModal() {
+            if (this.resizeObserver) this.resizeObserver.disconnect();
+            this.stopGameLoop();
+            const modal = document.getElementById("puzzle-modal");
+            if (modal) modal.style.display = "none";
+            document.body.style.overflow = "auto";
+            this.stopTimer();
+            if (this.state.scrollAnimationId) {
+                cancelAnimationFrame(this.state.scrollAnimationId);
+                this.state.scrollAnimationId = null;
+            }
+            this.state.snapAnimations.length = 0;
+            if (this.state.longPressTimer) {
+                clearTimeout(this.state.longPressTimer);
+                this.state.longPressTimer = null;
+            }
+            if (this.state.productInfoWrapper && this.state.originalProductInfoParent) {
+                this.state.originalProductInfoParent.appendChild(this.state.productInfoWrapper);
+            }
+            const imgContainer = document.getElementById("puzzle-product-image-container");
+            const formContainer = document.getElementById("puzzle-product-form-container");
+            if (imgContainer) imgContainer.innerHTML = "";
+            if (formContainer) formContainer.innerHTML = "";
+            this.state.isComplete = false;
+            this.state.gameStarted = false;
+            this.state.pieceCache.clear();
+            this.state.pieceCacheOrder.length = 0;
+            this.state.sliderScrollX = 0;
+            if (this.state.canvas) {
+                this.state.ctx.clearRect(0, 0, this.state.canvas.width, this.state.canvas.height);
+            }
+            const t = document.getElementById("timer-display");
+            if (t) t.textContent = "00:00";
+            const c = document.getElementById("puzzle-complete");
+            if (c) c.style.display = "none";
+            this.state.productInfoWrapper = null;
+            this.state.originalProductInfoParent = null;
+        },
+        init() {
+          if (this.state.isInitialized) return;
+          this.state.canvas = document.getElementById("puzzle-canvas");
+          if (!this.state.canvas) return;
+      
+          this.state.ctx = this.state.canvas.getContext("2d", { alpha: true, desynchronized: true });
+          this.checkMobileView();
+          const setup = document.getElementById("puzzle-setup-controls");
+          const pills = setup.querySelector(".puzzle-difficulty-pills");
+          const startBtn = document.getElementById("puzzle-btn-start-game");
+          const controls = document.querySelector(".puzzle-controls");
+          pills.addEventListener("click", (e) => {
+              if (e.target.matches("[data-difficulty]")) {
+                  const d = e.target.dataset.difficulty;
+                  this.state.difficulty = d;
+                  pills.querySelector(".active")?.classList.remove("active");
+                  e.target.classList.add("active");
+                  this.resetPuzzle();
+              }
+          });
+          startBtn.addEventListener("click", () => {
+              this.initAudio();
+              setup.style.display = "none";
+              controls.style.display = "flex";
+              setTimeout(() => {
+                  const ga = document.getElementById("puzzle-game-area");
+                  if (ga) this.state.gameAreaRect = ga.getBoundingClientRect();
+                  this.startPuzzle();
+              }, 50);
+          });
+          this.state.canvas.addEventListener("mousedown", this.handleMouseDown.bind(this));
+          this.state.canvas.addEventListener("touchstart", this.handleTouchStart.bind(this), { passive: false });
+          const moveMouse = this.throttle(this.handleMouseMove.bind(this), 16);
+          const moveTouch = this.throttle((e) => {
+              if (this.state.interactionMode !== "IDLE" || this.state.longPressTimer) {
+                  e.preventDefault();
+                  const t = e.touches[0];
+                  if (t) this.handleMouseMove({ clientX: t.clientX, clientY: t.clientY });
+              }
+          }, 16);
+          window.addEventListener("mousemove", moveMouse);
+          window.addEventListener("mouseup", this.handleMouseUp.bind(this));
+          window.addEventListener("touchmove", moveTouch, { passive: false });
+          window.addEventListener("touchend", this.handleMouseUp.bind(this));
+          document.getElementById("puzzle-close-btn").addEventListener("click", this.closePuzzleModal.bind(this));
+          document.getElementById("puzzle-btn-reset").addEventListener("click", this.resetToMainMenu.bind(this));
+          document.getElementById("puzzle-btn-play-again").addEventListener("click", this.resetToMainMenu.bind(this));
+          document.getElementById("puzzle-btn-preview").addEventListener("click", this.togglePreview.bind(this));
+          window.addEventListener(
+              "resize",
+              this.debounce(() => {
+                  this.state.dpr = window.devicePixelRatio || 1;
+                  this.checkMobileView();
+                  const ga = document.getElementById("puzzle-game-area");
+                  if (ga) {
+                      const rect = ga.getBoundingClientRect();
+                      this.state.gameAreaRect = rect;
+                      const dpr = this.state.dpr;
+                      this.state.canvas.width = rect.width * dpr;
+                      this.state.canvas.height = rect.height * dpr;
+                      this.state.canvas.style.width = rect.width + "px";
+                      this.state.canvas.style.height = rect.height + "px";
+                      this.state.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                      this.state.pieceCache.clear();
+                      this.state.pieceCacheOrder.length = 0;
+                      if (this.state.image) this.createPuzzlePieces();
+                      else this.markDirtyBoard();
+                  }
+              }, 250)
+          );
+          this.state.isInitialized = true;
+      },
+      async displayLeaderboard() {
+        const list = document.getElementById('leaderboard-list');
+        const loadingIndicator = document.getElementById('leaderboard-loading');
+        const completedDifficulty = this.state.difficulty;
+        if (!list || !loadingIndicator) return;
+        
+        list.innerHTML = ''; 
+        loadingIndicator.style.display = 'block';
+        
+        try {
+            const result = await PuzzleAPI.getLeaderboard(productId, completedDifficulty);
+            
+            loadingIndicator.style.display = 'none';
+            
+            if (result.success && result.leaderboard && result.leaderboard.length > 0) {
+                result.leaderboard.forEach(score => {
+                    const minutes = Math.floor(score.timeInSeconds / 60);
+                    const seconds = score.timeInSeconds % 60;
+                    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `<span>${score.nickname}</span> <strong>${timeString}</strong>`;
+                    list.appendChild(listItem);
+                });
+            } else {
+                list.innerHTML = '<li>Brak wyników.</li>';
+            }
+        } catch (error) {
+            loadingIndicator.style.display = 'none';
+            console.error("Błąd pobierania rankingu: ", error);
+            list.innerHTML = '<li>Błąd ładowania.</li>';
+        }
+    }
+    };
+    function openPuzzleModal() {
+        if (!PuzzleApp.state.isInitialized) PuzzleApp.init();
+        PuzzleApp._openPuzzleModal_internal();
+    }
+</script>

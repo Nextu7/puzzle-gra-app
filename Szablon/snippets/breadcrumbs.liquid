@@ -1,0 +1,79 @@
+{{ 'breadcrumbs.css' | asset_url | stylesheet_tag }}
+
+{% if template == 'collection' %}
+  <nav class="breadcrumbs-container" aria-label="breadcrumbs">
+    {% assign breadcrumb_links = '<span>' | append: collection.title | append: '</span>' %}
+    {% assign current_collection = collection %}
+    {% for i in (1..10) %}
+      {% if current_collection.metafields.custom.parent_category %}
+        {% assign parent_category = collections[current_collection.metafields.custom.parent_category] %}
+        {% assign breadcrumb_links = '<a href="' | append: parent_category.url | append: '">' | append: parent_category.title | append: '</a>' | append: breadcrumb_links %}
+        {% assign current_collection = parent_category %}
+      {% else %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+    {% if elementSettings.name != blank %}
+      <a href="/">{{ elementSettings.name }}</a>
+    {% endif %}
+    {{ breadcrumb_links }}
+  </nav>
+{% endif %}
+
+
+
+
+{% if template == 'product' and product.collections.size > 0 %}
+  <nav class="breadcrumbs-container page-width" aria-label="breadcrumbs">
+  {% assign selected_collection = nil %}
+  {% assign max_depth = 0 %}
+  {% for collection in product.collections %}
+    {% if collection.metafields.custom.include_in_products_breadcrumbs != false %}
+      {% assign current_collection = collection %}
+      {% assign depth = 1 %}
+      {% for i in (1..10) %}
+        {% if current_collection.metafields.custom.parent_category %}
+          {% assign parent_category = collections[current_collection.metafields.custom.parent_category] %}
+          {% if parent_category %}
+            {% assign depth = depth | plus: 1 %}
+            {% assign current_collection = parent_category %}
+          {% endif %}
+        {% else %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+      {% if depth > max_depth %}
+        {% assign max_depth = depth %}
+        {% assign selected_collection = collection %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% if selected_collection != nil %}
+    {% assign breadcrumb_links = '<a href="' | append: selected_collection.url | append: '">' | append: selected_collection.title | append: '</a>' %}
+    {% assign current_collection = selected_collection %}
+    {% for i in (1..10) %}
+      {% if current_collection.metafields.custom.parent_category %}
+        {% assign parent_category = collections[current_collection.metafields.custom.parent_category] %}
+        {% if parent_category %}
+          {% assign breadcrumb_links = '<a href="' | append: parent_category.url | append: '">' | append: parent_category.title | append: '</a>' | append: breadcrumb_links %}
+        {% endif %}
+        {% assign current_collection = parent_category %}
+      {% else %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+    {% if elementSettings.name != blank %}
+      <a href="/">{{ elementSettings.name }}</a> 
+    {% endif %}
+    {{ breadcrumb_links }}
+  {% else %}
+    {% if elementSettings.name != blank %}
+      <a href="/">{{ elementSettings.name }}</a> 
+    {% endif %}
+    <span>{{ product.title }}</span>
+  {% endif %}
+</nav>
+
+{% endif %}
+

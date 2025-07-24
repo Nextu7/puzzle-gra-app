@@ -1,0 +1,7 @@
+name = "Puzzle Game Extension"
+type = "theme"
+
+[[blocks]]
+type = "puzzle_game"
+name = "Puzzle Game"
+

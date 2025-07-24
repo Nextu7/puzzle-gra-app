@@ -1,0 +1,67 @@
+.collection-menu,
+.collection-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.collection-menu li {
+    margin: 0 0 0.6rem;
+}
+
+.collection-menu a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 1.4rem;
+    line-height: 1.3;
+    color: rgb(var(--color-link));
+    text-decoration: none;
+}
+
+.collection-menu a:hover {
+    text-decoration: underline;
+}
+
+.collection-menu > ul > li > ul,
+.collection-menu ul ul ul {
+    margin-left: 1.4rem;
+}
+
+.collection-menu li ul {
+    display: none;
+}
+
+.collection-menu li.open > ul {
+    display: block;
+}
+
+.collection-menu .icon-caret,
+.collection-menu .icon-caret svg {
+    width: 0.8rem;
+    height: 0.8rem;
+    display: block;
+    fill: currentColor;
+    transform: rotate(-90deg);
+    transition: transform 0.2s;
+}
+
+.collection-menu li.open > a .icon-caret {
+    transform: rotate(0deg);
+}
+
+.collection-menu .bold {
+    font-weight: 700;
+}
+
+.collection-menu a:hover .icon-caret {
+    text-decoration: none;
+}
+
+@media screen and (min-width: 990px) {
+  #menu-wedlug-kolekcji > ul {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem 2rem;
+  }
+}

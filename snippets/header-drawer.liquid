@@ -1,0 +1,194 @@
+<header-drawer data-breakpoint="{% if section.settings.menu_type_desktop == 'drawer' %}desktop{% else %}tablet{% endif %}">
+  <details id="Details-menu-drawer-container" class="menu-drawer-container">
+    <summary class="header__icon header__icon--menu header__icon--summary link focus-inset" aria-label="{{ 'sections.header.menu' | t }}">
+      <span>{{ 'icon-hamburger.svg' | inline_asset_content }}{{ 'icon-close.svg' | inline_asset_content }}</span>
+    </summary>
+
+    <div id="menu-drawer" class="gradient menu-drawer motion-reduce color-{{ section.settings.menu_color_scheme }}">
+      <div class="menu-drawer__inner-container">
+        <div class="menu-drawer__navigation-container">
+
+          {% assign puzzle_link   = section.settings.menu.links | where: 'title', 'Puzzle' | first %}
+          {% assign kolekcje_node = puzzle_link.links | where: 'title', 'Według kolekcji' | first %}
+          {% assign kategorie_node = puzzle_link.links | where: 'title', 'Według kategorii' | first %}
+          {% assign trud_node      = puzzle_link.links | where: 'title', 'Według trudności' | first %}
+          {% assign tabs = "kolekcje,kategorie,trudnosc" | split: "," %}
+
+          <nav class="menu-drawer__navigation">
+
+            <div class="menu-drawer__top-collections">
+              <ul class="menu-drawer__top-collections-list list-menu" role="list">
+                {% for link in section.settings.menu.links %}
+                  {% if link.links == blank %}
+                    <li>
+                      <a href="{{ link.url }}" class="menu-drawer__top-collection-item link link--text focus-inset{% if link.current %} menu-drawer__menu-item--active{% endif %}"{% if link.current %} aria-current="page"{% endif %}>
+                        <div class="drawer-menu__grandchild-image-wrapper">
+                          {% assign coll = link.object %}
+                          {% if coll and coll.image %}
+                            <img src="{{ coll.image | image_url: width: 120 }}" width="120" height="auto" alt="{{ link.title | escape }}" loading="lazy">
+                          {% else %}
+                            {% assign icon_src = '' %}
+                            {% for entry in shop.metaobjects.ikony_w_menu.values %}
+                              {% if entry.nazwa_w_menu.value == link.title %}{% assign icon_src = entry.ikona_do_menu.value %}{% break %}{% endif %}
+                            {% endfor %}
+                            {% if icon_src != '' %}
+                              <img src="{{ icon_src | image_url }}" width="120" height="auto">
+                            {% else %}
+                              {{ 'collection-1' | placeholder_svg_tag: 'placeholder-svg' }}
+                            {% endif %}
+                          {% endif %}
+                        </div>
+                        <span class="mega-menu__grandchild-title">{{ link.title | escape }}</span>
+                      </a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </div>
+
+            <div class="menu-drawer__tabs">
+              <button data-tab="kolekcje" class="drawer-tab-btn tab-active">Kolekcje</button>
+              <button data-tab="kategorie" class="drawer-tab-btn">Kategorie</button>
+              <button data-tab="trudnosc"  class="drawer-tab-btn">Trudność</button>
+            </div>
+
+            <div class="menu-drawer__tabs-body">
+              {% for tab in tabs %}
+                {% case tab %}
+                  {% when 'kolekcje' %}{% assign node = kolekcje_node %}
+                  {% when 'kategorie' %}{% assign node = kategorie_node %}
+                  {% when 'trudnosc'  %}{% assign node = trud_node %}
+                {% endcase %}
+                <div id="{{ tab }}" class="drawer-tab-content{% if forloop.first %} drawer-active{% endif %}">
+                  <ul class="menu-drawer__menu menu-drawer__menu--level-3 list-menu" role="list">
+                    {% for item in node.links %}
+                      <li>
+                        <a href="{{ item.url }}" class="menu-drawer__menu-item menu-drawer__menu-item--level-3 link link--text list-menu__item focus-inset{% if item.current %} menu-drawer__menu-item--active{% endif %}">
+                          <div class="mega-menu__grandchild-image-wrapper">
+                            {% assign col = item.object %}
+                            {% if col and col.image %}
+                              <img src="{{ col.image | image_url: width: 120 }}" width="120" height="auto" loading="lazy">
+                            {% else %}
+                              {% assign icon_src = '' %}
+                              {% for entry in shop.metaobjects.ikony_w_menu.values %}
+                                {% if entry.nazwa_w_menu.value == item.title %}
+                                  {% assign icon_src = entry.ikona_do_menu.value %}{% break %}
+                                {% endif %}
+                              {% endfor %}
+                              {% if icon_src != '' %}
+                                <img src="{{ icon_src | image_url }}" width="100%" height="auto">
+                              {% else %}
+                                {{ 'collection-1' | placeholder_svg_tag: 'placeholder-svg' }}
+                              {% endif %}
+                            {% endif %}
+                          </div>
+                          <span class="mega-menu__grandchild-title">{{ item.title | escape }}</span>
+                        </a>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endfor %}
+            </div>
+          </nav>
+
+          <style>
+            .menu-drawer__tabs{display:flex;border-top:.1rem solid rgba(var(--color-foreground),.08);border-bottom:.1rem solid rgba(var(--color-foreground),.08)}
+            .drawer-tab-btn{flex:1;padding:1.2rem 0;font-size:1.6rem;background:none;border:none;cursor:pointer}
+            .drawer-tab-btn.tab-active{color:rgb(var(--color-foreground));border-bottom:.1rem solid rgb(var(--color-foreground));font-weight:600}
+            .drawer-tab-content{display:none}
+            .drawer-tab-content.drawer-active{display:block}
+            .menu-drawer__top-collections-list{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:1rem;padding:1.5rem;margin:0;list-style:none;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+            .menu-drawer__top-collections-list::-webkit-scrollbar{display:none}
+            .menu-drawer__top-collection-item{display:flex;flex-direction:column;align-items:center;text-align:center;text-decoration: none;}
+            .menu-drawer__tabs button {
+              color: rgba(var(--color-foreground), .9);
+              font-size: 1.4rem;
+              font-family: Poppins;
+            }
+            .menu-drawer__navigation {
+              min-width: 0;
+            }
+          </style>
+
+          <script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const btns=document.querySelectorAll('.drawer-tab-btn'),
+        panels=document.querySelectorAll('.drawer-tab-content'),
+        show=id=>{
+          panels.forEach(p=>p.classList.toggle('drawer-active',p.id===id))
+          btns.forEach(b=>b.classList.toggle('tab-active',b.dataset.tab===id))
+        },
+        handler=e=>{
+          e.preventDefault()
+          e.stopImmediatePropagation()
+          show(e.currentTarget.dataset.tab)
+        }
+  btns.forEach(b=>{
+    b.type='button'
+    b.addEventListener('click',handler,true)
+  })
+  show('kolekcje')
+})
+</script>
+
+
+          <div class="menu-drawer__info-links">
+            <ul class="menu-drawer__info-list list-menu" role="list">
+              {% for entry in shop.metaobjects.info_links.values %}
+                {% if entry.ikona.value != blank and entry.url.value != blank %}
+                  <li><a href="{{ entry.url.value }}" class="menu-drawer__info-item list-menu__item link link--text focus-inset"><span><img src="{{ entry.ikona.value | image_url }}" width="auto" height="20"></span>{{ entry.nazwa.value }}</a></li>
+                {% endif %}
+              {% endfor %}
+            </ul>
+          </div>
+
+          {% if customer %}
+            {% assign acc_url = routes.account_url %}
+            {% assign acc_label = 'customer.account_fallback' | t %}
+          {% else %}
+            {% assign acc_url = routes.account_login_url %}
+            {% assign acc_label = 'customer.log_in' | t %}
+          {% endif %}
+
+          <div class="menu-drawer__utility-links">
+            {% if shop.customer_accounts_enabled %}
+              <a href="{{ acc_url }}" class="menu-drawer__account link focus-inset h5 medium-hide large-up-hide" rel="nofollow">
+                {% if section.settings.enable_customer_avatar %}
+                  <account-icon>{% if customer and customer.has_avatar? %}{{ customer | avatar }}{% else %}<span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span>{% endif %}</account-icon>
+                {% else %}
+                  <span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span>
+                {% endif %}
+                {{ acc_label }}
+              </a>
+            {% endif %}
+
+            {% if localization.available_countries or localization.available_languages %}
+              <div class="menu-drawer__localization header-localization">
+                {% if localization.available_countries.size > 1 %}
+                  <localization-form>{% form 'localization', id: 'HeaderCountryMobileForm', class: 'localization-form' %}<div>{% render 'country-localization', localPosition: 'HeaderCountryMobile' %}</div>{% endform %}</localization-form>
+                {% endif %}
+                {% if localization.available_languages.size > 1 %}
+                  <localization-form>{% form 'localization', id: 'HeaderLanguageMobileForm', class: 'localization-form' %}<div>{% render 'language-localization', localPosition: 'HeaderLanguageMobile' %}</div>{% endform %}</localization-form>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            <ul class="list list-social list-unstyled" role="list">
+              {% if settings.social_twitter_link != blank %}<li class="list-social__item"><a href="{{ settings.social_twitter_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-twitter.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.twitter' | t }}</span></a></li>{% endif %}
+              {% if settings.social_facebook_link != blank %}<li class="list-social__item"><a href="{{ settings.social_facebook_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-facebook.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.facebook' | t }}</span></a></li>{% endif %}
+              {% if settings.social_pinterest_link != blank %}<li class="list-social__item"><a href="{{ settings.social_pinterest_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-pinterest.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.pinterest' | t }}</span></a></li>{% endif %}
+              {% if settings.social_instagram_link != blank %}<li class="list-social__item"><a href="{{ settings.social_instagram_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-instagram.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.instagram' | t }}</span></a></li>{% endif %}
+              {% if settings.social_tiktok_link != blank %}<li class="list-social__item"><a href="{{ settings.social_tiktok_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-tiktok.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.tiktok' | t }}</span></a></li>{% endif %}
+              {% if settings.social_tumblr_link != blank %}<li class="list-social__item"><a href="{{ settings.social_tumblr_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-tumblr.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.tumblr' | t }}</span></a></li>{% endif %}
+              {% if settings.social_snapchat_link != blank %}<li class="list-social__item"><a href="{{ settings.social_snapchat_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-snapchat.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.snapchat' | t }}</span></a></li>{% endif %}
+              {% if settings.social_youtube_link != blank %}<li class="list-social__item"><a href="{{ settings.social_youtube_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-youtube.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.youtube' | t }}</span></a></li>{% endif %}
+              {% if settings.social_vimeo_link != blank %}<li class="list-social__item"><a href="{{ settings.social_vimeo_link }}" class="list-social__link link"><span class="svg-wrapper">{{ 'icon-vimeo.svg' | inline_asset_content }}</span><span class="visually-hidden">{{ 'general.social.links.vimeo' | t }}</span></a></li>{% endif %}
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </details>
+</header-drawer>

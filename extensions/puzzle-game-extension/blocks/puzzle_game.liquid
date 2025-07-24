@@ -1,0 +1,221 @@
+{{ 'puzzle-game.css' | asset_url | stylesheet_tag }}
+
+{% comment %} Secure image handling {% endcomment %}
+{% liquid
+  if product.metafields.custom.grafika and product.metafields.custom.grafika.value != blank
+    assign base_img = product.metafields.custom.grafika
+  else
+    assign base_img = product.featured_image
+  endif
+  
+  assign puzzle_src = base_img | image_url: width: 1600, format: webp, quality: 90
+  assign puzzle_preview = base_img | image_url: width: 800, format: webp, quality: 80
+%}
+
+<div class="shopify-puzzle-game-extension" {{ block.shopify_attributes }}>
+  <button 
+    type="button" 
+    class="puzzle-trigger-btn"
+    data-puzzle-product-id="{{ product.id }}"
+    data-puzzle-preview="{{ puzzle_preview }}"
+    data-puzzle-src="{{ puzzle_src }}"
+  >
+    {{ block.settings.button_text | default: 'Ułóż puzzle online' }}
+  </button>
+
+  <div class="puzzle-modal" style="display: none;">
+    <div class="puzzle-modal-content">
+      <button class="puzzle-close-btn">&times;</button>
+      <div class="puzzle-layout-container">
+        <div class="puzzle-left-section">
+          <div class="puzzle-setup-controls">
+            <p class="puzzle-setup-title">Wybierz poziom trudności:</p>
+            <div class="puzzle-difficulty-pills">
+              <button class="puzzle-btn" data-difficulty="p30">30</button>
+              <button class="puzzle-btn active" data-difficulty="p56">56</button>
+              <button class="puzzle-btn" data-difficulty="p99">99</button>
+              <button class="puzzle-btn" data-difficulty="p143">143</button>
+              <button class="puzzle-btn" data-difficulty="p304">304</button>
+            </div>
+            <button class="puzzle-btn puzzle-btn-start">Rozpocznij grę</button>
+          </div>
+          <div class="puzzle-container">
+            <div class="puzzle-controls" style="display: none;">
+              <button class="puzzle-btn puzzle-btn-reset"><span>↻</span> Reset</button>
+              <button class="puzzle-btn puzzle-btn-preview">Podgląd</button>
+              <span class="puzzle-timer">⏱️ Czas: <span class="timer-display">00:00</span></span>
+            </div>
+            <div class="puzzle-complete" style="display: none;">
+              <div class="puzzle-complete-content"><span>✓</span> PUZZLE UŁOŻONE!</div>
+              <div class="puzzle-complete-time"></div>
+              <div class="leaderboard-container">
+                <h4>🏆 Ranking dla tego poziomu 🏆</h4>
+                <ol class="leaderboard-list"></ol>
+                <div class="puzzle-loading" style="display: none;">Ładowanie rankingu...</div>
+              </div>
+              <button class="puzzle-btn">Zagraj ponownie</button>
+            </div>
+            <div class="puzzle-game-area">
+              <canvas id="puzzle-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="puzzle-product-section">
+          <div class="puzzle-product-container">
+            <div class="puzzle-product-image-container">
+              <img src="{{ puzzle_preview }}" alt="{{ product.title | escape }}">
+            </div>
+            <div class="puzzle-product-form-container">
+              <h3>{{ product.title | escape }}</h3>
+              <p>{{ product.price | money }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ 'firebase-loader.js' | asset_url | script_tag }}
+{{ 'puzzle-game.js' | asset_url | script_tag }}
+
+<script>
+(function() {
+  'use strict';
+  
+  // Wait for DOM and external scripts to load
+  function initializePuzzleGame() {
+    if (typeof ShopifyPuzzleGame === 'undefined') {
+      console.error('Puzzle game library not loaded');
+      return;
+    }
+
+    const container = document.querySelector('.shopify-puzzle-game-extension');
+    const triggerBtn = container?.querySelector('.puzzle-trigger-btn');
+    
+    if (!container || !triggerBtn) return;
+
+    // Get configuration from data attributes
+    const productId = parseInt(triggerBtn.dataset.puzzleProductId);
+    const puzzleSrc = triggerBtn.dataset.puzzleSrc;
+    const puzzlePreview = triggerBtn.dataset.puzzlePreview;
+    
+    // Prepare customer data securely
+    const customerData = {% if customer %}{
+      id: {{ customer.id }},
+      first_name: {{ customer.first_name | json }}
+    }{% else %}null{% endif %};
+
+    // Load Firebase config securely
+    fetch('/apps/puzzle-game/api/puzzle-config', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => response.json())
+    .then(configData => {
+      if (configData.error) {
+        throw new Error('Configuration error');
+      }
+
+      const gameConfig = {
+        firebase: configData.firebase,
+        productId: productId,
+        customerData: customerData,
+        images: {
+          src: puzzleSrc,
+          preview: puzzlePreview
+        }
+      };
+
+      // Initialize game
+      const game = ShopifyPuzzleGame.create(container, gameConfig);
+      
+      // Setup trigger button
+      triggerBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        game.openModal();
+      });
+    })
+    .catch(error => {
+      console.error('Failed to initialize puzzle game:', error);
+      triggerBtn.textContent = 'Gra niedostępna';
+      triggerBtn.disabled = true;
+    });
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePuzzleGame);
+  } else {
+    initializePuzzleGame();
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Puzzle Game",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Button Text",
+      "default": "Ułóż puzzle online",
+      "info": "Text displayed on the puzzle game trigger button"
+    },
+    {
+      "type": "select",
+      "id": "button_style",
+      "label": "Button Style",
+      "options": [
+        {"value": "primary", "label": "Primary"},
+        {"value": "secondary", "label": "Secondary"},
+        {"value": "outline", "label": "Outline"}
+      ],
+      "default": "primary"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_difficulty_count",
+      "label": "Show piece count in difficulty selector",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "default_difficulty",
+      "label": "Default Difficulty",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "default": 1,
+      "info": "0=30pcs, 1=56pcs, 2=99pcs, 3=143pcs, 4=304pcs"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_sound",
+      "label": "Enable sound effects",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_leaderboard",
+      "label": "Enable leaderboard",
+      "default": true,
+      "info": "Requires customer accounts to track scores"
+    },
+    {
+      "type": "header",
+      "content": "Advanced Settings"
+    },
+    {
+      "type": "text",
+      "id": "custom_firebase_project",
+      "label": "Custom Firebase Project ID",
+      "info": "Leave empty to use default project. Contact support for custom setup."
+    }
+  ]
+}
+{% endschema %}

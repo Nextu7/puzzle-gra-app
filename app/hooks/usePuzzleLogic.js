@@ -1,0 +1,301 @@
+import { useState, useCallback, useRef } from 'react';
+
+export const DIFFICULTY_LEVELS = {
+  p30: { cols: 2, rows: 2 },
+  p56: { cols: 7, rows: 8 },
+  p99: { cols: 9, rows: 11 },
+  p143: { cols: 11, rows: 13 },
+  p304: { cols: 16, rows: 19 },
+};
+
+export function usePuzzleLogic() {
+  const [gameState, setGameState] = useState({
+    isInitialized: false,
+    gameStarted: false,
+    difficulty: "p56",
+    isComplete: false,
+    showPreview: false,
+    pieces: [],
+    groups: [],
+    image: null,
+    startTime: null,
+    draggedGroup: null,
+    clickedPiece: null,
+    dragOffset: { x: 0, y: 0 },
+    SNAP_DISTANCE: 30,
+    interactionMode: "IDLE",
+    isMobile: false,
+    sliderScrollX: 0,
+    maxZ: 0
+  });
+
+  const canvasRef = useRef(null);
+  const gameAreaRef = useRef(null);
+  const timerRef = useRef(null);
+  const rngSeedRef = useRef(0);
+
+  const rng = useCallback(() => {
+    let t = (rngSeedRef.current += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }, []);
+
+  const generatePuzzleShape = useCallback((connections, w, h) => {
+    const tabW = w * 0.25;
+    const tabH = h * 0.25;
+    const neckW = w * 0.1;
+    const neckH = h * 0.1;
+    const segs = [];
+
+    segs.push("M 0,0");
+
+    // Top edge
+    if (connections.top === "out") {
+      const mid = w / 2;
+      segs.push(`L ${mid - neckW},0 C ${mid - neckW},-${tabH * 0.3} ${mid - tabW},-${tabH} ${mid},-${tabH} C ${mid + tabW},-${tabH} ${mid + neckW},-${tabH * 0.3} ${mid + neckW},0 L ${w},0`);
+    } else if (connections.top === "in") {
+      const mid = w / 2;
+      segs.push(`L ${mid - neckW},0 C ${mid - neckW},${tabH * 0.3} ${mid - tabW},${tabH} ${mid},${tabH} C ${mid + tabW},${tabH} ${mid + neckW},${tabH * 0.3} ${mid + neckW},0 L ${w},0`);
+    } else {
+      segs.push(`L ${w},0`);
+    }
+
+    // Right edge
+    if (connections.right === "out") {
+      const mid = h / 2;
+      segs.push(`L ${w},${mid - neckH} C ${w + tabW * 0.3},${mid - neckH} ${w + tabW},${mid - tabH} ${w + tabW},${mid} C ${w + tabW},${mid + tabH} ${w + tabW * 0.3},${mid + neckH} ${w},${mid + neckH} L ${w},${h}`);
+    } else if (connections.right === "in") {
+      const mid = h / 2;
+      segs.push(`L ${w},${mid - neckH} C ${w - tabW * 0.3},${mid - neckH} ${w - tabW},${mid - tabH} ${w - tabW},${mid} C ${w - tabW},${mid + tabH} ${w - tabW * 0.3},${mid + neckH} ${w},${mid + neckH} L ${w},${h}`);
+    } else {
+      segs.push(`L ${w},${h}`);
+    }
+
+    // Bottom edge
+    if (connections.bottom === "out") {
+      const mid = w / 2;
+      segs.push(`L ${mid + neckW},${h} C ${mid + neckW},${h + tabH * 0.3} ${mid + tabW},${h + tabH} ${mid},${h + tabH} C ${mid - tabW},${h + tabH} ${mid - neckW},${h + tabH * 0.3} ${mid - neckW},${h} L 0,${h}`);
+    } else if (connections.bottom === "in") {
+      const mid = w / 2;
+      segs.push(`L ${mid + neckW},${h} C ${mid + neckW},${h - tabH * 0.3} ${mid + tabW},${h - tabH} ${mid},${h - tabH} C ${mid - tabW},${h - tabH} ${mid - neckW},${h - tabH * 0.3} ${mid - neckW},${h} L 0,${h}`);
+    } else {
+      segs.push(`L 0,${h}`);
+    }
+
+    // Left edge
+    if (connections.left === "out") {
+      const mid = h / 2;
+      segs.push(`L 0,${mid + neckH} C -${tabW * 0.3},${mid + neckH} -${tabW},${mid + tabH} -${tabW},${mid} C -${tabW},${mid - tabH} -${tabW * 0.3},${mid - neckH} 0,${mid - neckH} L 0,0`);
+    } else if (connections.left === "in") {
+      const mid = h / 2;
+      segs.push(`L 0,${mid + neckH} C ${tabW * 0.3},${mid + neckH} ${tabW},${mid + tabH} ${tabW},${mid} C ${tabW},${mid - tabH} ${tabW * 0.3},${mid - neckH} 0,${mid - neckH} L 0,0`);
+    } else {
+      segs.push(`L 0,0`);
+    }
+
+    segs.push("Z");
+    return segs.join(" ");
+  }, []);
+
+  const generateConnections = useCallback((cols, rows) => {
+    const connections = {};
+    const layout = [];
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const id = r * cols + c;
+        layout.push({ id, row: r, col: c });
+        connections[id] = { top: null, right: null, bottom: null, left: null };
+      }
+    }
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const id = r * cols + c;
+        
+        if (r > 0) {
+          const topId = (r - 1) * cols + c;
+          if (connections[topId].bottom === null) {
+            connections[topId].bottom = rng() > 0.5 ? "out" : "in";
+          }
+          connections[id].top = connections[topId].bottom === "out" ? "in" : "out";
+        }
+        
+        if (c > 0) {
+          const leftId = r * cols + (c - 1);
+          if (connections[leftId].right === null) {
+            connections[leftId].right = rng() > 0.5 ? "out" : "in";
+          }
+          connections[id].left = connections[leftId].right === "out" ? "in" : "out";
+        }
+        
+        if (c < cols - 1) connections[id].right = rng() > 0.5 ? "out" : "in";
+        if (r < rows - 1) connections[id].bottom = rng() > 0.5 ? "out" : "in";
+      }
+    }
+
+    return { connections, layout };
+  }, [rng]);
+
+  const createPuzzlePieces = useCallback((image, gameAreaRect) => {
+    if (!image || !gameAreaRect) return;
+
+    const level = DIFFICULTY_LEVELS[gameState.difficulty];
+    let cols, rows;
+    
+    if (image.aspectRatio > 1) {
+      cols = level.rows;
+      rows = level.cols;
+    } else {
+      cols = level.cols;
+      rows = level.rows;
+    }
+
+    const { connections, layout } = generateConnections(cols, rows);
+    
+    const maxW = gameAreaRect.width - 20;
+    const maxH = gameState.isMobile ? gameAreaRect.height - 120 - 20 : gameAreaRect.height - 20;
+    
+    let boardWidth = maxW;
+    let boardHeight = boardWidth / image.aspectRatio;
+    
+    if (boardHeight > maxH) {
+      boardHeight = maxH;
+      boardWidth = boardHeight * image.aspectRatio;
+    }
+
+    const pieceWidth = boardWidth / cols;
+    const pieceHeight = boardHeight / rows;
+    
+    const centerX = gameAreaRect.width / 2;
+    const centerY = (gameState.isMobile ? gameAreaRect.height - 120 : gameAreaRect.height) / 2;
+    const targetX = centerX - boardWidth / 2;
+    const targetY = centerY - boardHeight / 2;
+
+    const pieces = layout.map(({ id, row, col }) => {
+      const shape = generatePuzzleShape(connections[id], pieceWidth, pieceHeight);
+      return {
+        id,
+        row,
+        col,
+        shape,
+        path2D: new Path2D(shape),
+        connections: connections[id],
+        x: targetX + col * pieceWidth,
+        y: targetY + row * pieceHeight,
+        correctX: targetX + col * pieceWidth,
+        correctY: targetY + row * pieceHeight,
+        groupId: id,
+        zIndex: id + 1,
+        isFixed: false,
+        inSlider: false,
+        neighbors: {
+          top: row > 0 ? (row - 1) * cols + col : null,
+          right: col < cols - 1 ? id + 1 : null,
+          bottom: row < rows - 1 ? (row + 1) * cols + col : null,
+          left: col > 0 ? id - 1 : null
+        },
+        boardWidth,
+        boardHeight,
+        pieceWidth,
+        pieceHeight
+      };
+    });
+
+    const groups = pieces.map(p => ({
+      id: p.groupId,
+      pieces: [p.id],
+      fringe: new Set([p.id])
+    }));
+
+    setGameState(prev => ({
+      ...prev,
+      pieces,
+      groups,
+      SNAP_DISTANCE: Math.min(Math.max(Math.min(pieceWidth, pieceHeight) * 0.6, 10), 32),
+      targetPosition: { x: targetX, y: targetY, width: boardWidth, height: boardHeight },
+      maxZ: pieces.length
+    }));
+
+    return { pieces, groups };
+  }, [gameState.difficulty, gameState.isMobile, generateConnections, generatePuzzleShape]);
+
+  const canConnect = useCallback((p1, p2, groupId) => {
+    const r = p1.neighbors.right === p2.id;
+    const l = p1.neighbors.left === p2.id;
+    const b = p1.neighbors.bottom === p2.id;
+    const t = p1.neighbors.top === p2.id;
+    
+    if (!r && !l && !b && !t) return null;
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const sd = gameState.SNAP_DISTANCE;
+    const dragged = p1.groupId === groupId;
+    
+    let connection = null;
+    
+    if (r && Math.abs(dx - p1.pieceWidth) < sd && Math.abs(dy) < sd) {
+      connection = { offsetX: p2.x - p1.pieceWidth - p1.x, offsetY: p2.y - p1.y };
+    } else if (l && Math.abs(dx + p2.pieceWidth) < sd && Math.abs(dy) < sd) {
+      connection = { offsetX: p2.x + p2.pieceWidth - p1.x, offsetY: p2.y - p1.y };
+    } else if (b && Math.abs(dy - p1.pieceHeight) < sd && Math.abs(dx) < sd) {
+      connection = { offsetX: p2.x - p1.x, offsetY: p2.y - p1.pieceHeight - p1.y };
+    } else if (t && Math.abs(dy + p2.pieceHeight) < sd && Math.abs(dx) < sd) {
+      connection = { offsetX: p2.x - p1.x, offsetY: p2.y + p2.pieceHeight - p1.y };
+    }
+
+    if (connection && dragged) {
+      return {
+        ...connection,
+        movingGroup: p1.groupId,
+        staticGroup: p2.groupId,
+        movingPieceId: p1.id,
+        staticPieceId: p2.id
+      };
+    }
+    
+    return null;
+  }, [gameState.SNAP_DISTANCE]);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    const startTime = Date.now();
+    setGameState(prev => ({ ...prev, startTime }));
+    
+    timerRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      // Timer display will be handled by component
+    }, 1000);
+  }, []);
+
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const updateGameState = useCallback((updates) => {
+    setGameState(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  return {
+    gameState,
+    canvasRef,
+    gameAreaRef,
+    timerRef,
+    generatePuzzleShape,
+    generateConnections,
+    createPuzzlePieces,
+    canConnect,
+    startTimer,
+    stopTimer,
+    updateGameState,
+    rng
+  };
+}

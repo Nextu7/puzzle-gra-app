@@ -1,0 +1,299 @@
+/*
+ * ------------------------------------------------------------
+ * IMPORTANT: The contents of this file are auto-generated.
+ *
+ * This file may be updated by the Shopify admin theme editor
+ * or related systems. Please exercise caution as any changes
+ * made to this file may be overwritten.
+ * ------------------------------------------------------------
+ */
+{
+  "sections": {
+    "slideshow_X7DVfE": {
+      "type": "slideshow",
+      "blocks": {
+        "slide_NFHeEg": {
+          "type": "slide",
+          "settings": {
+            "image": "shopify://shop_images/Kolekcja_Pokoj_z_zabawkami.webp",
+            "image_overlay_opacity": 40,
+            "heading": "Czas na puzzle!",
+            "heading_size": "h1",
+            "subheading": "",
+            "button_label": "Odkryj bestsellery",
+            "link": "shopify://collections/bestsellery",
+            "button_style_secondary": false,
+            "show_text_box": false,
+            "box_align": "middle-left",
+            "text_alignment": "center",
+            "text_alignment_mobile": "left",
+            "color_scheme": "scheme-4"
+          }
+        }
+      },
+      "block_order": [
+        "slide_NFHeEg"
+      ],
+      "settings": {
+        "layout": "full_bleed",
+        "slide_height": "medium",
+        "slider_visual": "dots",
+        "auto_rotate": false,
+        "change_slides_speed": 5,
+        "image_behavior": "none",
+        "show_text_below": false,
+        "accessibility_info": "Pokaz slajdów na temat naszej marki"
+      }
+    },
+    "collection_list_BFxXaN": {
+      "type": "collection-list",
+      "blocks": {
+        "featured_collection_FGpXym": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "czas-na-uczte"
+          }
+        },
+        "featured_collection_hadaQk": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "echa-starych-basni"
+          }
+        },
+        "featured_collection_XXHzHk": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "gdzies-w-eterze"
+          }
+        },
+        "featured_collection_pzeyaE": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "kolorowe-obrazki"
+          }
+        },
+        "featured_collection_FPFbAf": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "kroniki-innego-wymiaru"
+          }
+        },
+        "featured_collection_G3LRgg": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "miedzy-tu-a-tam"
+          }
+        },
+        "featured_collection_T4Pham": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "na-granicy-absurdu"
+          }
+        },
+        "featured_collection_YDa9qi": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "na-granicy-wyobrazni"
+          }
+        },
+        "featured_collection_dKTGCm": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "osobliwe-swiaty"
+          }
+        },
+        "featured_collection_JYgEJE": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "pokoj-z-zabawkami"
+          }
+        },
+        "featured_collection_wz463D": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "poza-granica-percepcji"
+          }
+        },
+        "featured_collection_ErNEfx": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "protokol-zero"
+          }
+        },
+        "featured_collection_H9mPYF": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "rzeczy-ulotne"
+          }
+        },
+        "featured_collection_acnTxF": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "rownolegle-odbicia"
+          }
+        },
+        "featured_collection_NMF7BH": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "sepia-nexus"
+          }
+        },
+        "featured_collection_xBU4eX": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "seria-b"
+          }
+        },
+        "featured_collection_GfgTwq": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "strefa-spokoju"
+          }
+        },
+        "featured_collection_JpkA6f": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "swiat-po-pierwszej-kawie"
+          }
+        },
+        "featured_collection_7U4XQG": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "tryb-awaryjny"
+          }
+        },
+        "featured_collection_8VQyAF": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "ukojenie-w-glebinach"
+          }
+        },
+        "featured_collection_YTBFPt": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "w-drodze-donikad"
+          }
+        },
+        "featured_collection_JmFVMa": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "wizje-i-miraze"
+          }
+        },
+        "featured_collection_jA3Jwf": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "z-glowy-artysty"
+          }
+        },
+        "featured_collection_ffqXbD": {
+          "type": "featured_collection",
+          "settings": {
+            "collection": "zapiski-malarza"
+          }
+        }
+      },
+      "block_order": [
+        "featured_collection_FGpXym",
+        "featured_collection_hadaQk",
+        "featured_collection_XXHzHk",
+        "featured_collection_pzeyaE",
+        "featured_collection_FPFbAf",
+        "featured_collection_G3LRgg",
+        "featured_collection_T4Pham",
+        "featured_collection_YDa9qi",
+        "featured_collection_dKTGCm",
+        "featured_collection_JYgEJE",
+        "featured_collection_wz463D",
+        "featured_collection_ErNEfx",
+        "featured_collection_H9mPYF",
+        "featured_collection_acnTxF",
+        "featured_collection_NMF7BH",
+        "featured_collection_xBU4eX",
+        "featured_collection_GfgTwq",
+        "featured_collection_JpkA6f",
+        "featured_collection_7U4XQG",
+        "featured_collection_8VQyAF",
+        "featured_collection_YTBFPt",
+        "featured_collection_JmFVMa",
+        "featured_collection_jA3Jwf",
+        "featured_collection_ffqXbD"
+      ],
+      "settings": {
+        "title": "",
+        "heading_size": "h1",
+        "image_ratio": "circle",
+        "columns_desktop": 6,
+        "color_scheme": "scheme-1",
+        "show_view_all": false,
+        "columns_mobile": "2",
+        "swipe_on_mobile": true,
+        "padding_top": 36,
+        "padding_bottom": 36
+      }
+    },
+    "featured_collection": {
+      "type": "featured-collection",
+      "settings": {
+        "collection": "test2-custom-ladne-produkty",
+        "products_to_show": 15,
+        "title": "Bestsellery",
+        "heading_size": "h1",
+        "description": "",
+        "show_description": false,
+        "description_style": "body",
+        "columns_desktop": 6,
+        "enable_desktop_slider": false,
+        "full_width": false,
+        "show_view_all": false,
+        "view_all_style": "solid",
+        "color_scheme": "scheme-1",
+        "image_ratio": "adapt",
+        "image_shape": "default",
+        "show_secondary_image": false,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "none",
+        "columns_mobile": "1",
+        "swipe_on_mobile": false,
+        "padding_top": 44,
+        "padding_bottom": 36
+      }
+    },
+    "featured_collection_baWFwD": {
+      "type": "featured-collection",
+      "name": "t:sections.featured-collection.presets.name",
+      "settings": {
+        "collection": "nowosci",
+        "products_to_show": 15,
+        "title": "Nowości",
+        "heading_size": "h1",
+        "description": "",
+        "show_description": false,
+        "description_style": "body",
+        "columns_desktop": 6,
+        "enable_desktop_slider": false,
+        "full_width": false,
+        "show_view_all": false,
+        "view_all_style": "solid",
+        "color_scheme": "",
+        "image_ratio": "adapt",
+        "image_shape": "default",
+        "show_secondary_image": false,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "none",
+        "columns_mobile": "2",
+        "swipe_on_mobile": false,
+        "padding_top": 36,
+        "padding_bottom": 36
+      }
+    }
+  },
+  "order": [
+    "slideshow_X7DVfE",
+    "collection_list_BFxXaN",
+    "featured_collection",
+    "featured_collection_baWFwD"
+  ]
+}
