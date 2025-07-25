@@ -11,7 +11,7 @@
     "env": "shopify app env",
     "start": "remix-serve ./build/server/index.js",
     "docker-start": "npm run setup && npm run start",
-    "setup": "scripts\\prisma-generate.cmd && prisma migrate deploy",
+    "setup": "prisma generate && prisma migrate deploy",
     "prisma:generate": "scripts\\prisma-generate.cmd",
     "dev:clean": "scripts\\prisma-generate.cmd && shopify app dev",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
