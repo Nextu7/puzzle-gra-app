@@ -1,4 +1,5 @@
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 export class AuthService {
   static async validateShopifySession(request) {
@@ -23,21 +24,71 @@ export class AuthService {
       return auth;
     }
 
-    // For now, we trust the customer ID from the frontend
-    // In production, you might want to validate this against Shopify's customer API
-    if (!customerId) {
+    // Validate customer ID format
+    if (!customerId || typeof customerId !== 'string') {
       return {
         isValid: false,
-        error: "Customer ID is required"
+        error: "Valid customer ID is required"
       };
     }
 
-    return {
-      isValid: true,
-      shop: auth.shop,
-      customerId: customerId.toString(),
-      session: auth.session
-    };
+    // Validate customer ID format (should be numeric string)
+    if (!/^\d+$/.test(customerId)) {
+      return {
+        isValid: false,
+        error: "Invalid customer ID format"
+      };
+    }
+
+    try {
+      // Verify customer exists in Shopify
+      const customerQuery = `
+        query getCustomer($id: ID!) {
+          customer(id: $id) {
+            id
+            email
+            firstName
+            lastName
+            state
+          }
+        }
+      `;
+
+      const response = await auth.session.graphql(customerQuery, {
+        variables: { id: `gid://shopify/Customer/${customerId}` }
+      });
+
+      const customerData = await response.json();
+      
+      if (!customerData.data?.customer) {
+        return {
+          isValid: false,
+          error: "Customer not found"
+        };
+      }
+
+      // Check if customer account is enabled
+      if (customerData.data.customer.state === 'DISABLED') {
+        return {
+          isValid: false,
+          error: "Customer account is disabled"
+        };
+      }
+
+      return {
+        isValid: true,
+        shop: auth.shop,
+        customerId: customerId.toString(),
+        session: auth.session,
+        customerData: customerData.data.customer
+      };
+    } catch (error) {
+      console.error('Customer validation error:', error);
+      return {
+        isValid: false,
+        error: "Failed to validate customer"
+      };
+    }
   }
 
   static async requireAuth(request) {
@@ -56,34 +107,77 @@ export class AuthService {
     return auth;
   }
 
-  static validateRateLimit(shop, action, maxRequests = 100, windowMs = 60000) {
-    // Simple in-memory rate limiting
-    // In production, use Redis or similar
-    if (!global.rateLimitStore) {
-      global.rateLimitStore = new Map();
-    }
-
+  static async validateRateLimit(shop, action, maxRequests = 100, windowMs = 60000) {
     const key = `${shop}:${action}`;
-    const now = Date.now();
-    const windowStart = now - windowMs;
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - windowMs);
 
-    const requests = global.rateLimitStore.get(key) || [];
-    const validRequests = requests.filter(time => time > windowStart);
+    try {
+      // Clean up old rate limit entries
+      await prisma.rateLimit.deleteMany({
+        where: {
+          window: {
+            lt: windowStart
+          }
+        }
+      });
 
-    if (validRequests.length >= maxRequests) {
+      // Get current rate limit record
+      const existing = await prisma.rateLimit.findUnique({
+        where: { key }
+      });
+
+      if (existing) {
+        // Check if within rate limit
+        if (existing.requests >= maxRequests && existing.window > windowStart) {
+          return {
+            allowed: false,
+            resetTime: new Date(existing.window.getTime() + windowMs),
+            remaining: 0
+          };
+        }
+
+        // Update existing record
+        const updated = await prisma.rateLimit.update({
+          where: { key },
+          data: {
+            requests: existing.window > windowStart ? existing.requests + 1 : 1,
+            window: existing.window > windowStart ? existing.window : now,
+            shop: shop
+          }
+        });
+
+        return {
+          allowed: true,
+          remaining: Math.max(0, maxRequests - updated.requests),
+          resetTime: new Date(updated.window.getTime() + windowMs)
+        };
+      } else {
+        // Create new rate limit record
+        await prisma.rateLimit.create({
+          data: {
+            key,
+            requests: 1,
+            window: now,
+            shop: shop
+          }
+        });
+
+        return {
+          allowed: true,
+          remaining: maxRequests - 1,
+          resetTime: new Date(now.getTime() + windowMs)
+        };
+      }
+    } catch (error) {
+      console.error('Rate limit validation error:', error);
+      // Fall back to allowing the request if database fails
       return {
-        allowed: false,
-        resetTime: Math.min(...validRequests) + windowMs
+        allowed: true,
+        remaining: maxRequests,
+        error: 'Rate limit check failed'
       };
     }
-
-    validRequests.push(now);
-    global.rateLimitStore.set(key, validRequests);
-
-    return {
-      allowed: true,
-      remaining: maxRequests - validRequests.length
-    };
   }
 
   static validateInputSafety(input) {

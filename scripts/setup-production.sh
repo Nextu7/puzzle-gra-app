@@ -10,8 +10,21 @@ fi
 
 echo "Using DATABASE_URL: $DATABASE_URL"
 
+# Check if database exists and create it if not
+if [ ! -f "/opt/render/project/data/production.sqlite" ]; then
+    echo "Creating new production database..."
+    touch /opt/render/project/data/production.sqlite
+fi
+
 # Generate Prisma client and run migrations
+echo "Generating Prisma client..."
 npx prisma generate
+
+echo "Running database migrations..."
 npx prisma migrate deploy
 
-echo "Database setup completed"
+# Verify database setup
+echo "Verifying database setup..."
+npx prisma db push --accept-data-loss
+
+echo "Database setup completed successfully"

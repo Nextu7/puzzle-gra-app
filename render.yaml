@@ -5,7 +5,7 @@ services:
     plan: starter
     buildCommand: |
       npm ci
-      npm run setup-production
+      npm run setup
       npm run build
     startCommand: npm run start
     envVars:
@@ -13,6 +13,8 @@ services:
         value: production
       - key: DATABASE_URL
         value: file:/opt/render/project/data/production.sqlite
+      - key: SCOPES
+        value: read_products,read_customers
       - key: SHOPIFY_API_KEY
         sync: false
       - key: SHOPIFY_API_SECRET

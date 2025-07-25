@@ -89,3 +89,16 @@ model GameSession {
   
   @@index([shop, productId])
 }
+
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  requests  Int      @default(1)
+  window    DateTime @default(now())
+  shop      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([key, window])
+  @@index([shop])
+}

@@ -1,11 +1,23 @@
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { FirebaseService } from "../services/firebase.server";
+import { MonitoringService, EnhancedAuthService } from "../services/monitoring.server";
+import { AuthService } from "../services/auth.server";
 
 export const action = async ({ request }) => {
+  const startTime = Date.now();
+  
   try {
-    // Authenticate with Shopify
-    const { session } = await authenticate.admin(request);
+    // Enhanced authentication with logging
+    const auth = await EnhancedAuthService.validateShopifySessionWithLogging(request);
+    if (!auth.isValid) {
+      return json({ 
+        success: false, 
+        error: "Authentication failed" 
+      }, { status: 401 });
+    }
+    
+    const { session } = auth;
     const shop = session.shop;
     
     if (request.method === "POST") {
@@ -48,18 +60,21 @@ export const action = async ({ request }) => {
         }, { status: 400 });
       }
 
-      // Rate limiting - max 10 scores per minute per shop
-      const rateLimitKey = `score_${shop}_${Math.floor(Date.now() / 60000)}`;
-      if (!global.scoreRateLimit) global.scoreRateLimit = new Map();
-      
-      const currentCount = global.scoreRateLimit.get(rateLimitKey) || 0;
-      if (currentCount >= 10) {
+      // Enhanced rate limiting using database
+      const rateLimit = await AuthService.validateRateLimit(shop, 'score_submission', 10, 60000);
+      if (!rateLimit.allowed) {
+        await MonitoringService.logAuthEvent('RATE_LIMIT_EXCEEDED', {
+          shop,
+          action: 'score_submission',
+          resetTime: rateLimit.resetTime
+        });
+        
         return json({ 
           success: false, 
-          error: "Rate limit exceeded. Too many score submissions." 
+          error: "Rate limit exceeded. Too many score submissions.",
+          resetTime: rateLimit.resetTime
         }, { status: 429 });
       }
-      global.scoreRateLimit.set(rateLimitKey, currentCount + 1);
 
       // Save score through Firebase
       const scoreData = {
@@ -71,6 +86,9 @@ export const action = async ({ request }) => {
       };
 
       const score = await FirebaseService.saveScore(scoreData);
+      
+      const duration = Date.now() - startTime;
+      await MonitoringService.trackApiCall(shop, 'scores/create', true, duration);
       
       return json({ 
         success: true, 
@@ -89,7 +107,13 @@ export const action = async ({ request }) => {
     }, { status: 405 });
 
   } catch (error) {
-    console.error('API Error in puzzle scores:', error);
+    const duration = Date.now() - startTime;
+    await MonitoringService.logError(error, {
+      endpoint: 'api/puzzle/scores',
+      method: request.method,
+      duration,
+      request: MonitoringService.formatRequestInfo(request)
+    });
     
     // Don't expose internal errors to client
     return json({ 
