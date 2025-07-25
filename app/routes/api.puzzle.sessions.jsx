@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { PuzzleService } from "../services/puzzle.server";
+import { FirebaseService } from "../services/firebase.server";
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -14,12 +14,14 @@ export const action = async ({ request }) => {
         return json({ error: "Product ID and difficulty are required" }, { status: 400 });
       }
 
-      const gameSession = await PuzzleService.createGameSession(
-        playerId, 
-        productId, 
-        difficulty, 
-        shop
-      );
+      const sessionData = {
+        customerId: playerId,
+        productId,
+        difficulty,
+        shopId: shop
+      };
+
+      const gameSession = await FirebaseService.createGameSession(sessionData);
       
       return json({ 
         success: true, 
@@ -42,7 +44,11 @@ export const action = async ({ request }) => {
         return json({ error: "Session ID and time spent are required" }, { status: 400 });
       }
 
-      const gameSession = await PuzzleService.completeGameSession(sessionId, timeSpent);
+      const gameSession = await FirebaseService.updateGameSession(sessionId, {
+        timeSpent,
+        completedAt: new Date(),
+        status: 'completed'
+      });
       
       return json({ 
         success: true, 

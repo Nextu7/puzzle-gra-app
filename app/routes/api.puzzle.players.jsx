@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { PuzzleService } from "../services/puzzle.server";
+import { FirebaseService } from "../services/firebase.server";
 import { AuthService } from "../services/auth.server";
 
 export const action = async ({ request }) => {
@@ -27,14 +27,20 @@ export const action = async ({ request }) => {
         return json({ error: "Rate limit exceeded" }, { status: 429 });
       }
 
-      const player = await PuzzleService.getOrCreatePlayer(shop, customerId, nickname);
+      // Check if player exists
+      let player = await FirebaseService.getPlayerProfile(customerId);
+      
+      if (!player) {
+        // Create new player profile
+        player = await FirebaseService.createPlayerProfile(customerId, nickname || 'Anonymous');
+      }
       
       return json({ 
         success: true, 
         player: {
           id: player.id,
           nickname: player.nickname,
-          customerId: player.customerId
+          customerId: customerId
         }
       });
     } catch (error) {
@@ -64,7 +70,7 @@ export const action = async ({ request }) => {
         return json({ error: "Rate limit exceeded" }, { status: 429 });
       }
 
-      const player = await PuzzleService.updatePlayerNickname(playerId, nickname);
+      const player = await FirebaseService.updatePlayerProfile(playerId, { nickname });
       
       return json({ 
         success: true, 

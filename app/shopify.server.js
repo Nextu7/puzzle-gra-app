@@ -4,16 +4,19 @@ import {
   AppDistribution,
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
-import { MemorySessionStorage } from "@shopify/shopify-app-remix/server";
+import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY || "temp_key",
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "temp_secret",
   apiVersion: ApiVersion.January25,
   scopes: process.env.SCOPES?.split(",") || ["read_products"],
-  appUrl: "https://puzzle-gra-app.onrender.com",
+  appUrl: process.env.SHOPIFY_APP_URL || "https://puzzle-gra-app.onrender.com",
   authPathPrefix: "/auth",
-  sessionStorage: new MemorySessionStorage(),
+  sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
   future: {
     unstable_newEmbeddedAuthStrategy: true,

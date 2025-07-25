@@ -1,17 +1,64 @@
-// Disabled Firebase Admin for Render deployment
-// import { initializeApp, getApps, cert } from 'firebase-admin/app';
-// import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 let adminApp;
 let adminDb;
 
 function initializeFirebaseAdmin() {
-  // Temporary: Skip Firebase Admin for development
-  // TODO: Add proper service account credentials
-  console.log('Firebase Admin SDK temporarily disabled - using mock data');
-  adminApp = null;
-  adminDb = null;
-  return { adminApp: null, adminDb: null };
+  try {
+    // Check if already initialized
+    if (getApps().length > 0) {
+      adminApp = getApps()[0];
+      adminDb = getFirestore(adminApp);
+      return { adminApp, adminDb };
+    }
+
+    // Initialize Firebase Admin with service account file
+    if (process.env.NODE_ENV === 'production') {
+      // Read service account from secret file on Render
+      const fs = require('fs');
+      const serviceAccountPath = '/etc/secrets/firebase-service-account';
+      
+      if (fs.existsSync(serviceAccountPath)) {
+        const serviceAccountContent = fs.readFileSync(serviceAccountPath, 'utf8');
+        const serviceAccount = JSON.parse(serviceAccountContent);
+        
+        adminApp = initializeApp({
+          credential: cert(serviceAccount),
+          projectId: process.env.FIREBASE_PROJECT_ID
+        });
+      } else {
+        throw new Error('Firebase service account file not found');
+      }
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      // Development - use environment variable
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      
+      adminApp = initializeApp({
+        credential: cert(serviceAccount),
+        projectId: process.env.FIREBASE_PROJECT_ID
+      });
+    } else if (process.env.FIREBASE_PROJECT_ID) {
+      // Use default credentials in production (Google Cloud)
+      adminApp = initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID
+      });
+    } else {
+      throw new Error('Firebase configuration missing');
+    }
+
+    adminDb = getFirestore(adminApp);
+    console.log('Firebase Admin SDK initialized successfully');
+    
+    return { adminApp, adminDb };
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    // Fallback to mock for development
+    console.log('Using mock Firebase for development');
+    adminApp = null;
+    adminDb = null;
+    return { adminApp: null, adminDb: null };
+  }
 }
 
 // Initialize on module load
@@ -19,7 +66,12 @@ const { adminApp: app, adminDb: db } = initializeFirebaseAdmin();
 
 export class FirebaseService {
   static get db() {
-    // Return mock db for development
+    // Return real Firebase db if available, otherwise mock
+    if (adminDb) {
+      return adminDb;
+    }
+    
+    // Mock db for development/fallback
     return {
       collection: () => ({
         doc: () => ({

@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { PuzzleService } from "../services/puzzle.server";
+import { FirebaseService } from "../services/firebase.server";
 
 export const action = async ({ request }) => {
   try {
@@ -61,14 +61,16 @@ export const action = async ({ request }) => {
       }
       global.scoreRateLimit.set(rateLimitKey, currentCount + 1);
 
-      // Save score through secure service
-      const score = await PuzzleService.saveScore(
-        playerId, 
-        productId, 
-        difficulty, 
-        Math.floor(timeInSeconds), // Ensure integer
-        shop
-      );
+      // Save score through Firebase
+      const scoreData = {
+        customerId: playerId,
+        productId,
+        difficulty,
+        timeInSeconds: Math.floor(timeInSeconds),
+        shopId: shop
+      };
+
+      const score = await FirebaseService.saveScore(scoreData);
       
       return json({ 
         success: true, 
@@ -119,12 +121,11 @@ export const loader = async ({ request }) => {
     const maxLimit = 100;
     const validLimit = Math.min(Math.max(1, limit), maxLimit);
 
-    const leaderboard = await PuzzleService.getLeaderboard(
+    const leaderboard = await FirebaseService.getLeaderboard(
       productId, 
       difficulty, 
-      shop, 
       validLimit,
-      global
+      global ? null : shop
     );
     
     return json({ 
